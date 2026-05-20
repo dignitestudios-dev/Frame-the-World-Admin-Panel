@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, use } from "react";
+import React, { useState, use } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   BookImage,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Globe,
-  ImageIcon,
-  Lock,
+  Clock,
   RefreshCw,
   ZoomIn,
 } from "lucide-react";
@@ -105,16 +104,21 @@ function FramePostCard({
   post: FramePost;
   onView: () => void;
 }) {
+  const imgSrc = post.media?.location;
+  if (!imgSrc) return null;
+
+  const status = post.status ?? "unknown";
+  const isCompleted = status === "completed";
+
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      {/* Image */}
       <div
         className="relative aspect-[4/3] cursor-pointer overflow-hidden bg-muted"
         onClick={onView}
       >
         <Image
-          src={post.cover.location}
-          alt={post.title}
+          src={imgSrc}
+          alt="Post image"
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -127,32 +131,30 @@ function FramePostCard({
           </div>
         </div>
 
-        {/* Bottom gradient overlay with title */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent px-3 pb-2.5 pt-8">
-          <p className="truncate text-sm font-semibold text-white">
-            {post.title}
-          </p>
-        </div>
-
-        {/* Top badges */}
-        <div className="absolute right-2 top-2 flex gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-            {post.isPrivate ? (
-              <>
-                <Lock className="size-2.5" /> Private
-              </>
-            ) : (
-              <>
-                <Globe className="size-2.5" /> Public
-              </>
-            )}
+        {/* Status badge */}
+        <div className="absolute left-2 top-2">
+          <span className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm",
+            isCompleted
+              ? "bg-emerald-500/15 text-emerald-600 border-emerald-200"
+              : "bg-amber-500/15 text-amber-600 border-amber-200"
+          )}>
+            {isCompleted
+              ? <CheckCircle2 className="size-2.5" />
+              : <Clock className="size-2.5" />}
+            {isCompleted ? "Completed" : "Pending"}
           </span>
-          {post.totalPosts > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/80 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-              <ImageIcon className="size-2.5" /> {post.totalPosts}
-            </span>
-          )}
         </div>
+      </div>
+
+      {/* Meta */}
+      <div className="p-3">
+        {post.caption && (
+          <p className="mb-1 truncate text-xs font-medium text-foreground">{post.caption}</p>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          {post.createdAt ? new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+        </p>
       </div>
     </div>
   );
@@ -177,7 +179,9 @@ export default function FramePostsPage({
   });
 
   const posts = data?.data ?? [];
-  const slides = posts.map((p) => ({ src: p.cover.location, alt: p.title }));
+  const slides = posts
+    .filter((p) => p.media?.location)
+    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
 
   return (
     <div className="space-y-6 p-6">
@@ -245,13 +249,22 @@ export default function FramePostsPage({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {posts.map((post, i) => (
-              <FramePostCard
-                key={post._id}
-                post={post}
-                onView={() => setLightboxIndex(i)}
-              />
-            ))}
+            {posts.reduce<{ el: React.ReactNode[]; idx: number }>(
+              (acc, post) => {
+                const hasMedia = !!post.media?.location;
+                const slideIdx = hasMedia ? acc.idx : -1;
+                acc.el.push(
+                  <FramePostCard
+                    key={post._id}
+                    post={post}
+                    onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
+                  />
+                );
+                if (hasMedia) acc.idx += 1;
+                return acc;
+              },
+              { el: [], idx: 0 }
+            ).el}
           </div>
         )}
       </div>

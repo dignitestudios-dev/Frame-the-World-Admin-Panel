@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { use } from "react";
+import React, { useState, use } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -88,6 +87,7 @@ function Pager({ pagination, page, isFetching, onPage }: PagerProps) {
 // ─── Post card ────────────────────────────────────────────────────────────────
 
 function PostCard({ post, onView }: { post: Post; onView: () => void }) {
+  if (!post.media?.location) return null;
   const status = getStatus(post.status);
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
@@ -122,6 +122,7 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
 // ─── Frame card ───────────────────────────────────────────────────────────────
 
 function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
+  if (!frame.cover?.location) return null;
   const isClickable = (frame.totalPosts ?? 0) >= 1;
   return (
     <div
@@ -134,7 +135,7 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         <Image
           src={frame.cover.location}
-          alt={frame.title}
+          alt={frame.title ?? "Frame"}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -157,10 +158,10 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
         </div>
       </div>
       <div className="flex items-center justify-between p-3">
-        <p className="text-[11px] text-muted-foreground">{fmtDate(frame.cover.createdAt)}</p>
+        <p className="text-[11px] text-muted-foreground">{fmtDate(frame.cover?.createdAt ?? "")}</p>
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
           <ImageIcon className="size-2.5" />
-          {frame.totalPosts} {frame.totalPosts === 1 ? "post" : "posts"}
+          {frame.totalPosts ?? 0} {frame.totalPosts === 1 ? "post" : "posts"}
         </span>
       </div>
     </div>
@@ -211,7 +212,9 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
   const frames = framesData?.data ?? [];
   const isFetching = postsFetching || framesFetching;
 
-  const slides = posts.map((p) => ({ src: p.media.location, alt: "Post image" }));
+  const slides = posts
+    .filter((p) => p.media?.location)
+    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
 
   return (
     <div className="space-y-6 p-6">
@@ -291,9 +294,21 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
             {postsLoading ? <GridSkeleton /> : posts.length === 0
               ? <Empty icon={Images} label="posts" />
               : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                  {posts.map((post, i) => (
-                    <PostCard key={post._id} post={post} onView={() => setLightboxIndex(i)} />
-                  ))}
+                  {posts.reduce<{ el: React.ReactNode[]; idx: number }>(
+                    (acc, post) => {
+                      const slideIdx = post.media?.location ? acc.idx : -1;
+                      acc.el.push(
+                        <PostCard
+                          key={post._id}
+                          post={post}
+                          onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
+                        />
+                      );
+                      if (post.media?.location) acc.idx += 1;
+                      return acc;
+                    },
+                    { el: [], idx: 0 }
+                  ).el}
                 </div>
             }
           </div>

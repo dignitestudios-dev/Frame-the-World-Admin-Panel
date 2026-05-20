@@ -697,9 +697,6 @@ export default function PromoCodesPage() {
 
   const { data: promoCodes = [], isLoading, isFetching, refetch } = usePromoCodes();
 
-  const active = promoCodes.filter((p) => p.active);
-  const inactive = promoCodes.filter((p) => !p.active);
-
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -754,7 +751,7 @@ export default function PromoCodesPage() {
             />
             <StatCard
               label="Active"
-              value={active.length}
+              value={promoCodes.filter((p) => p.active).length}
               icon={CheckCircle2}
               iconBg="bg-emerald-500/10"
               iconColor="text-emerald-600"
@@ -762,7 +759,7 @@ export default function PromoCodesPage() {
             />
             <StatCard
               label="Inactive"
-              value={inactive.length}
+              value={promoCodes.filter((p) => !p.active).length}
               icon={XCircle}
               iconBg="bg-muted/60"
               iconColor="text-muted-foreground"
@@ -794,33 +791,11 @@ export default function PromoCodesPage() {
             </Button>
           </div>
         ) : (
-          <>
-            {/* Active section */}
-            {active.length > 0 && (
-              <div className="space-y-2">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <CheckCircle2 className="size-3.5 text-emerald-500" />
-                  Active ({active.length})
-                </p>
-                {active.map((p) => (
-                  <PromoRow key={p.id} promo={p} />
-                ))}
-              </div>
-            )}
-
-            {/* Inactive section */}
-            {inactive.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <XCircle className="size-3.5" />
-                  Inactive ({inactive.length})
-                </p>
-                {inactive.map((p) => (
-                  <PromoRow key={p.id} promo={p} />
-                ))}
-              </div>
-            )}
-          </>
+          <div className="space-y-2">
+            {promoCodes.map((p) => (
+              <PromoRow key={p.id} promo={p} />
+            ))}
+          </div>
         )}
       </div>
 

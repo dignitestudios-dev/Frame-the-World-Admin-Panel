@@ -4,29 +4,35 @@ import { API } from "./axios";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ContentMedia {
-  _id: string;
-  fileName: string;
-  key: string;
+  _id?: string;
+  fileName?: string;
+  filename?: string; // some endpoints return lowercase
+  key?: string;
   location: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Post {
   _id: string;
-  media: ContentMedia;
+  media?: ContentMedia | null;
   status: string;
+  caption?: string | null;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface Frame {
   _id: string;
   title: string;
-  cover: ContentMedia;
-  totalPosts: number;
-  isPrivate: boolean;
+  cover?: ContentMedia | null;
+  totalPosts?: number;
+  isPrivate?: boolean;
 }
+
+// FramePost = a post returned by GET /frames/:frameId/posts
+// Has the same shape as Post
+export type FramePost = Post;
 
 export interface ContentPagination {
   itemsPerPage: number;
@@ -47,14 +53,6 @@ interface FramesResponse {
   message: string;
   data: Frame[];
   pagination: ContentPagination;
-}
-
-export interface FramePost {
-  _id: string;
-  title: string;
-  cover: ContentMedia;
-  totalPosts: number;
-  isPrivate: boolean;
 }
 
 interface FramePostsResponse {

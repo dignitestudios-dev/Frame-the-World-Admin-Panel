@@ -147,13 +147,12 @@ export const UsersTable = ({
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                    title="View Posts & Frames"
+                    variant="outline"
+                    size="sm"
                     onClick={() => router.push(`/dashboard/users/${user._id}/content`)}
                   >
                     <Images className="size-4" />
+                    Posts & Frames
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => onViewUser(user)}>
                     <Eye className="size-4" />

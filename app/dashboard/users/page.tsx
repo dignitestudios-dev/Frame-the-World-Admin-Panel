@@ -99,7 +99,7 @@ export default function UsersPage() {
       />
 
       <Card className="border shadow-sm">
-        <CardContent className="py-3 px-4">
+        <CardContent className="py-0 px-4">
           <UsersFilters
             search={searchInput}
             status={status}
