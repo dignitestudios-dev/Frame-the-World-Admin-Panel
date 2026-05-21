@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 
-export const baseURL = "https://api.dev.frametheworld.org";
+export const baseURL = "https://api.staging.frametheworld.org";
 
 const DEVICE_MODEL = "Admin_Session";
 const DEVICE_UNIQUE_ID = "UUID_FTW-AdminPanel-A3F9B2C1D4E5F6A7B8C9D0E1F2A3B4C5";
