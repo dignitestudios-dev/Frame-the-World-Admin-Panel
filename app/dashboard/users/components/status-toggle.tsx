@@ -24,7 +24,7 @@ export const StatusToggle = ({ active, loading, onToggle }: StatusToggleProps) =
     </span>
     <span
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        active ? "bg-gradient-to-r from-emerald-600 to-emerald-400" : "bg-slate-300"
+        active ? "bg-linear-to-r from-emerald-600 to-emerald-400" : "bg-slate-300"
       }`}
     >
       {loading ? (

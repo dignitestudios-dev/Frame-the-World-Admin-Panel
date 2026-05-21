@@ -13,6 +13,8 @@ import {
   UserX,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +25,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { User } from "@/lib/api/users.api";
+import { useSetUserStatus } from "@/lib/api/users.api";
 import { UserAvatar } from "./user-avatar";
 import { IdentityStatusBadge } from "./identity-status-badge";
 import { StatusToggle } from "./status-toggle";
+import RejectionReasonDialog from "./rejection-reason-dialog";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
@@ -94,6 +98,33 @@ export const UserDetailDialog = ({
   onToggleBlock,
 }: UserDetailDialogProps) => {
   const router = useRouter();
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const setStatusMutation = useSetUserStatus();
+  const setStatus = setStatusMutation.mutateAsync;
+  const isSetting = (setStatusMutation as any).isPending ?? false;
+// console.log(isSetting)
+  const handleApprove = async () => {
+    if (!user) return;
+    try {
+      await setStatus({ userId: user._id, status: "approved" });
+      toast.success("Identity approved.");
+      onClose();
+    } catch {
+      toast.error("Failed to update identity status. Please try again.");
+    }
+  };
+
+  const handleConfirmReject = async (reason: string | null) => {
+    if (!user) return;
+    try {
+      await setStatus({ userId: user._id, status: "rejected", rejectionReason: reason });
+      toast.success("Identity rejected.");
+      setShowRejectDialog(false);
+      onClose();
+    } catch {
+      toast.error("Failed to update identity status. Please try again.");
+    }
+  };
 
   return (
   <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -114,26 +145,41 @@ export const UserDetailDialog = ({
       ) : (
         <div className="space-y-5">
           {/* ── Profile header ── */}
-          <div className="flex items-start gap-4 rounded-xl bg-muted/40 p-4">
-            <UserAvatar
-              name={user.name}
-              email={user.email}
-              photoUrl={user.profilePicture?.location}
-              size="lg"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-base truncate">
-                {user.name ?? "Unnamed User"}
-              </p>
-              <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-              {user.bio && (
-                <p className="mt-1 text-xs text-muted-foreground italic line-clamp-2">
-                  &ldquo;{user.bio}&rdquo;
+          <div className="flex items-start justify-between gap-4 rounded-xl bg-muted/40 p-4">
+            <div className="flex items-start gap-4 min-w-0 flex-1">
+              <UserAvatar
+                name={user.name}
+                email={user.email}
+                photoUrl={user.profilePicture?.location}
+                size="lg"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-base truncate">
+                  {user.name ?? "Unnamed User"}
                 </p>
-              )}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <IdentityStatusBadge status={user.identityStatus ?? null} />
+                <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                {user.bio && (
+                  <p className="mt-1 text-xs text-muted-foreground italic line-clamp-2">
+                    &ldquo;{user.bio}&rdquo;
+                  </p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <IdentityStatusBadge status={user.identityStatus ?? null} />
+                </div>
               </div>
+            </div>
+
+            <div className="flex flex-col items-end gap-2">
+              {user.identityStatus === "pending" && (
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={handleApprove} disabled={isSetting || showRejectDialog}>
+                    Approve
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setShowRejectDialog(true)} disabled={isSetting || showRejectDialog}>
+                    Reject
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -158,11 +204,16 @@ export const UserDetailDialog = ({
                 <p className="text-xs text-muted-foreground">Toggle to block or restore access</p>
               </div>
               <StatusToggle
-                active={user.isActive}
+                active={
+                  typeof user.isDeactivatedByAdmin === "boolean"
+                    ? !user.isDeactivatedByAdmin
+                    : user.isActive
+                }
                 loading={togglingId === user._id}
                 onToggle={() => onToggleBlock(user)}
               />
             </div>
+            {/* buttons moved to profile header for consistent placement */}
           </Section>
 
           <Separator />
@@ -201,7 +252,7 @@ export const UserDetailDialog = ({
                 )
               }
             />
-            {user.badges.length > 0 && (
+            {user?.badges?.length > 0 && (
               <InfoRow
                 icon={<ShieldCheck className="size-3.5" />}
                 label="Badges"
@@ -269,9 +320,15 @@ export const UserDetailDialog = ({
               </Section>
             </>
           )}
+          <RejectionReasonDialog
+            open={showRejectDialog}
+            submitting={isSetting}
+            onClose={() => setShowRejectDialog(false)}
+            onConfirm={handleConfirmReject}
+          />
         </div>
       )}
-    </DialogContent>
+      </DialogContent>
   </Dialog>
   );
 };

@@ -19,6 +19,7 @@ import { UsersFilters } from "./components/users-filters";
 import { UsersTable } from "./components/users-table";
 import { UsersPaginationBar } from "./components/users-pagination";
 import { UserDetailDialog } from "./components/user-detail-dialog";
+import DeactivationReasonDialog from "./components/deactivation-reason-dialog";
 
 const DEBOUNCE_MS = 500;
 
@@ -34,6 +35,7 @@ export default function UsersPage() {
   const [status, setStatus] = useState<UserStatus | "">("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deactivationUser, setDeactivationUser] = useState<User | null>(null);
 
   const isSearchPending = searchInput !== debouncedSearch;
 
@@ -70,22 +72,48 @@ export default function UsersPage() {
   };
 
   const handleToggleBlock = async (user: User) => {
+    const currentlyActive =
+      typeof user.isDeactivatedByAdmin === "boolean"
+        ? !user.isDeactivatedByAdmin
+        : user.isActive;
+
+    if (currentlyActive) {
+      // Open dialog to collect optional admin reason
+      setDeactivationUser(user);
+      return;
+    }
+
+    // Activation path (restore)
     setTogglingId(user._id);
     try {
-      if (user.isActive) {
-        await blockUser(user._id);
-        toast.success(`${user.name ?? user.email} has been deactivated.`);
-      } else {
-        await unblockUser(user._id);
-        toast.success(`${user.name ?? user.email} has been activated.`);
-      }
+      await unblockUser(user._id);
+      toast.success(`${user.name ?? user.email} has been activated.`);
+
       if (selectedUser?._id === user._id) {
-        setSelectedUser((prev) => prev ? { ...prev, isActive: !prev.isActive } : null);
+        setSelectedUser((prev) => prev ? { ...prev, isActive: true, isDeactivatedByAdmin: false } : null);
       }
     } catch {
       toast.error("Failed to update account status. Please try again.");
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleConfirmDeactivation = async (reason: string | null) => {
+    if (!deactivationUser) return;
+    setTogglingId(deactivationUser._id);
+    try {
+      await blockUser({ userId: deactivationUser._id, reason });
+      toast.success(`${deactivationUser.name ?? deactivationUser.email} has been deactivated.`);
+
+      if (selectedUser?._id === deactivationUser._id) {
+        setSelectedUser((prev) => prev ? { ...prev, isActive: false, isDeactivatedByAdmin: true } : null);
+      }
+    } catch {
+      toast.error("Failed to update account status. Please try again.");
+    } finally {
+      setTogglingId(null);
+      setDeactivationUser(null);
     }
   };
 
@@ -135,6 +163,14 @@ export default function UsersPage() {
         togglingId={togglingId}
         onClose={handleCloseDialog}
         onToggleBlock={handleToggleBlock}
+      />
+
+      <DeactivationReasonDialog
+        open={Boolean(deactivationUser)}
+        initial={deactivationUser?.isDeactivatedByAdmin ? "" : ""}
+        submitting={Boolean(togglingId && deactivationUser && togglingId === deactivationUser._id)}
+        onClose={() => setDeactivationUser(null)}
+        onConfirm={handleConfirmDeactivation}
       />
     </div>
   );

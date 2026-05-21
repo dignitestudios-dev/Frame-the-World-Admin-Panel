@@ -169,7 +169,7 @@ function CreatePromoDialog({
     setSelectedPlan(null);
     onClose();
   };
-
+// console.log(p)
   const onSubmit = (values: PromoFormValues) => {
     if (!selectedPlan) return;
 
@@ -417,7 +417,7 @@ function CreatePromoDialog({
             <Separator />
 
             {/* Duration */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label>Duration <span className="text-destructive">*</span></Label>
               <div className="grid grid-cols-3 gap-2">
                 <Controller
@@ -468,7 +468,7 @@ function CreatePromoDialog({
                   )}
                 </div>
               )}
-            </div>
+            </div> */}
 
             <Separator />
 
@@ -626,11 +626,11 @@ function PromoRow({ promo }: { promo: PromoCode }) {
       {/* Coupon ID — hidden on mobile */}
       <div className="hidden sm:block text-center">
         <p className="text-[10px] text-muted-foreground mb-0.5">Coupon</p>
-        <p className="font-mono text-xs font-medium">{promo.coupon.coupon}</p>
+        <p className="font-mono text-xs font-medium">{promo?.code}</p>
       </div>
 
       {/* Redemptions */}
-      <div className="hidden sm:block text-center min-w-[80px]">
+      <div className="hidden sm:block text-center min-w-20">
         <p className="text-[10px] text-muted-foreground mb-0.5">Redeemed</p>
         <p className="text-sm font-semibold">
           {promo.timesRedeemed}
@@ -696,6 +696,7 @@ export default function PromoCodesPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data: promoCodes = [], isLoading, isFetching, refetch } = usePromoCodes();
+//  const promoCodes = promo
 
   return (
     <div className="space-y-6 p-6">
@@ -745,13 +746,13 @@ export default function PromoCodesPage() {
           <>
             <StatCard
               label="Total Codes"
-              value={promoCodes.length}
+              value={promoCodes?.length}
               icon={Hash}
               gradient
             />
             <StatCard
               label="Active"
-              value={promoCodes.filter((p) => p.active).length}
+              value={promoCodes?.filter((p) => p.active).length}
               icon={CheckCircle2}
               iconBg="bg-emerald-500/10"
               iconColor="text-emerald-600"
@@ -759,7 +760,7 @@ export default function PromoCodesPage() {
             />
             <StatCard
               label="Inactive"
-              value={promoCodes.filter((p) => !p.active).length}
+              value={promoCodes?.filter((p) => !p.active).length}
               icon={XCircle}
               iconBg="bg-muted/60"
               iconColor="text-muted-foreground"
@@ -792,7 +793,7 @@ export default function PromoCodesPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {promoCodes.map((p) => (
+            {promoCodes?.map((p) => (
               <PromoRow key={p.id} promo={p} />
             ))}
           </div>

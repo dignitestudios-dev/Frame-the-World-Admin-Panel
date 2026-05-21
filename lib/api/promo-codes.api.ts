@@ -52,7 +52,14 @@ export interface PromoCode {
 interface PromoCodesResponse {
   success: boolean;
   message: string;
-  data: PromoCode[];
+  // some backends return the array directly in `data`, others namespace it under groups like `monthly` and `yearly`
+  data: PromoCode[] | Record<string, PromoCode[] | undefined>;
+  pagination?: {
+    itemsPerPage: number;
+    currentPage: number;
+    totalItems: number;
+    totalPages: number;
+  };
 }
 
 export type DiscountType = "percent" | "amount";
@@ -88,7 +95,30 @@ const fetchPromoCodes = async (): Promise<PromoCode[]> => {
   const { data } = await API.get<PromoCodesResponse>(
     "/subscriptions/stripe/promo-code"
   );
-  return data.data;
+
+  // Support multiple response shapes:
+  // - { data: PromoCode[] }
+  // - { data: { monthly: PromoCode[], yearly: PromoCode[], ... }, pagination: {...} }
+  if (Array.isArray(data.data)) return data.data as PromoCode[];
+
+  // If data.data is an object with groups (monthly, yearly, ...), merge all arrays
+  if (data.data && typeof data.data === "object") {
+    const groups = Object.values(data.data) as Array<PromoCode[] | undefined>;
+    const combined: PromoCode[] = [];
+    for (const g of groups) {
+      if (Array.isArray(g)) combined.push(...g);
+    }
+
+    // Deduplicate by id while preserving first-seen order
+    const seen = new Map<string, PromoCode>();
+    for (const p of combined) {
+      if (!seen.has(p.id)) seen.set(p.id, p);
+    }
+    return Array.from(seen.values());
+  }
+
+  // Fallback: return empty list
+  return [];
 };
 
 const createPromoCode = async (

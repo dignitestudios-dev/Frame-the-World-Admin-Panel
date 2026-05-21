@@ -52,6 +52,8 @@ export interface User {
   clia: string | null;
   identityStatus: string | null;
   isActive: boolean;
+  // If present, indicates whether the user was deactivated by an admin.
+  isDeactivatedByAdmin?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -104,12 +106,36 @@ const fetchUsers = async (params: UsersParams): Promise<UsersResponse> => {
   return data;
 };
 
-const blockUser = (userId: string) => API.patch(`/users/${userId}/deactivate`);
-const unblockUser = (userId: string) => API.patch(`/users/${userId}/activate`);
+interface DeactivationPayload {
+  isDeactivatedByAdmin: boolean;
+  deactivationReason?: string | null;
+}
+
+const updateDeactivation = (userId: string, payload: DeactivationPayload) =>
+  API.patch(`/users/${userId}/deactivation`, payload);
+
+const blockUser = ({ userId, reason }: { userId: string; reason?: string | null }) =>
+  updateDeactivation(userId, { isDeactivatedByAdmin: true, deactivationReason: reason ?? null });
+
+const unblockUser = (userId: string) =>
+  updateDeactivation(userId, { isDeactivatedByAdmin: false });
 const fetchUserById = async (userId: string): Promise<User> => {
   const { data } = await API.get<UserByIdResponse>(`/users/${userId}`);
   return data.data;
 };
+
+// Update user identity/status (approve or reject)
+interface StatusPayload {
+  status: "approved" | "rejected";
+  rejectionReason?: string | null;
+}
+
+const updateUserStatus = (userId: string, payload: StatusPayload) =>
+  API.patch(`/users/${userId}/status`, payload);
+
+const setUserStatus = (opts: { userId: string; status: "approved" | "rejected"; rejectionReason?: string | null }) =>
+  updateUserStatus(opts.userId, { status: opts.status, rejectionReason: opts.rejectionReason ?? null });
+
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +166,14 @@ export const useUnblockUser = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: unblockUser,
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  });
+};
+
+export const useSetUserStatus = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: setUserStatus,
     onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 };

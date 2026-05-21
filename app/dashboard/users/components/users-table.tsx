@@ -110,10 +110,10 @@ export const UsersTable = ({
                     photoUrl={user.profilePicture?.location}
                   />
                   <div className="min-w-0">
-                    <p className="font-medium leading-tight truncate max-w-[160px]">
+                    <p className="font-medium leading-tight truncate max-w-40">
                       {user.name ?? "Unnamed User"}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                    <p className="text-xs text-muted-foreground truncate max-w-40">
                       {user.email}
                     </p>
                   </div>
@@ -135,8 +135,13 @@ export const UsersTable = ({
                 <IdentityStatusBadge status={user.identityStatus ?? null} />
               </TableCell>
               <TableCell>
+                {/* derive active state from isDeactivatedByAdmin when provided by the API */}
                 <StatusToggle
-                  active={user.isActive}
+                  active={
+                    typeof user.isDeactivatedByAdmin === "boolean"
+                      ? !user.isDeactivatedByAdmin
+                      : user.isActive
+                  }
                   loading={togglingId === user._id}
                   onToggle={() => onToggleBlock(user)}
                 />
