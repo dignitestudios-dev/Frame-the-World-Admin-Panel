@@ -118,7 +118,7 @@ const blockUser = ({ userId, reason }: { userId: string; reason?: string | null 
   updateDeactivation(userId, { isDeactivatedByAdmin: true, deactivationReason: reason ?? null });
 
 const unblockUser = (userId: string) =>
-  updateDeactivation(userId, { isDeactivatedByAdmin: false });
+  updateDeactivation(userId, { isDeactivatedByAdmin: false, deactivationReason: "User activated" });
 const fetchUserById = async (userId: string): Promise<User> => {
   const { data } = await API.get<UserByIdResponse>(`/users/${userId}`);
   return data.data;
