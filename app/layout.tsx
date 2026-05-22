@@ -43,7 +43,27 @@ export default function RootLayout({
       >
         <ProgressBar />
         <ConnectionStatus />
-        <Toaster position="top-center" richColors />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: "linear-gradient(135deg, #68A6E0 0%, #263DF3 100%)",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "12px",
+              boxShadow: "0 8px 32px rgba(38, 61, 243, 0.35), 0 2px 8px rgba(38, 61, 243, 0.2)",
+              fontWeight: "500",
+              fontSize: "14px",
+              padding: "12px 16px",
+            },
+            classNames: {
+              success: "toast-success",
+              error: "toast-error",
+              warning: "toast-warning",
+              info: "toast-info",
+            },
+          }}
+        />
         <Providers>
           <SidebarConfigProvider>{children}</SidebarConfigProvider>
         </Providers>

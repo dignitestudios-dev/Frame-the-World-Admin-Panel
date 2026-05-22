@@ -213,7 +213,26 @@ export const UserDetailDialog = ({
                 onToggle={() => onToggleBlock(user)}
               />
             </div>
-            {/* buttons moved to profile header for consistent placement */}
+
+            {user.isDeactivatedByAdmin && user.deactivationReason && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 mt-2">
+                <UserX className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-destructive mb-0.5">Deactivation Reason</p>
+                  <p className="text-sm text-destructive/80 break-words">{user.deactivationReason}</p>
+                </div>
+              </div>
+            )}
+
+            {user.identityStatus === "rejected" && user.rejectionReason && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-orange-400/20 bg-orange-400/5 px-4 py-3 mt-2">
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-orange-500" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-orange-500 mb-0.5">Rejection Reason</p>
+                  <p className="text-sm text-orange-500/80 break-words">{user.rejectionReason}</p>
+                </div>
+              </div>
+            )}
           </Section>
 
           <Separator />

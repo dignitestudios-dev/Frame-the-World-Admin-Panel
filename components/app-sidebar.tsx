@@ -4,10 +4,8 @@ import * as React from "react";
 import {
   LayoutDashboard,
   Users,
-  BarChart3,
   Ticket,
   ShieldAlert,
-  Bot,
   Trophy,
   Award,
 } from "lucide-react";
@@ -51,16 +49,6 @@ const data = {
       ],
     },
     {
-      label: "Analytics",
-      items: [
-        {
-          title: "Advanced Analytics",
-          url: "/dashboard/analytics",
-          icon: BarChart3,
-        },
-      ],
-    },
-    {
       label: "Promotions",
       items: [
         {
@@ -83,11 +71,6 @@ const data = {
     {
       label: "Tools & Insights",
       items: [
-        {
-          title: "AI Tools",
-          url: "/dashboard/ai-tools",
-          icon: Bot,
-        },
         {
           title: "Leaderboard",
           url: "/dashboard/leaderboard",

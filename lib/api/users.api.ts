@@ -54,6 +54,8 @@ export interface User {
   isActive: boolean;
   // If present, indicates whether the user was deactivated by an admin.
   isDeactivatedByAdmin?: boolean;
+  deactivationReason?: string | null;
+  rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
