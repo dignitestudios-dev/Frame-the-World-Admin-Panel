@@ -12,6 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatCard, StatCardSkeleton } from "@/components/stat-card";
 import { useAnalyticsOverview } from "@/lib/api/analytics.api";
+import { ActiveSubscribersChart } from "@/components/charts-and-graphs/ActiveSubscribersChart";
+import { PostsCreatedChart } from "@/components/charts-and-graphs/PostsCreatedChart";
+import { PostUpvotesChart } from "@/components/charts-and-graphs/PostUpvotesChart";
+import { PostDownloadsChart } from "@/components/charts-and-graphs/PostDownloadsChart";
 
 const STAT_CARDS = [
   {
@@ -91,6 +95,14 @@ export default function DashboardPage() {
                 gradient
               />
             ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ActiveSubscribersChart />
+        <PostsCreatedChart />
+        <PostUpvotesChart />
+        <PostDownloadsChart />
       </div>
     </div>
   );
