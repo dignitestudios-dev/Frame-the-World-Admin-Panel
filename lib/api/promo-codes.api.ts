@@ -45,8 +45,16 @@ export interface PromoCode {
   maxRedemptions: number | null;
   timesRedeemed: number;
   restrictions: PromoRestrictions;
-  coupon: { coupon: string; type: string };
-  customer: string | null;
+  coupon?: { coupon: string; type: string };
+  customer?: string | null;
+  planId?: string;
+  planLabel?: string;
+  /** "monthly" | "yearly" — derived from API response group key */
+  planKey?: string;
+  discountType?: DiscountType;
+  percentOff?: number;
+  amountOff?: number;
+  currency?: string;
 }
 
 interface PromoCodesResponse {
@@ -102,11 +110,17 @@ const fetchPromoCodes = async (): Promise<PromoCode[]> => {
   if (Array.isArray(data.data)) return data.data as PromoCode[];
 
   // If data.data is an object with groups (monthly, yearly, ...), merge all arrays
+  // and stamp each item with its group key so the UI can show "Monthly" / "Yearly"
   if (data.data && typeof data.data === "object") {
-    const groups = Object.values(data.data) as Array<PromoCode[] | undefined>;
+    const grouped = data.data as Record<string, PromoCode[] | undefined>;
     const combined: PromoCode[] = [];
-    for (const g of groups) {
-      if (Array.isArray(g)) combined.push(...g);
+
+    for (const [groupKey, items] of Object.entries(grouped)) {
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          combined.push({ ...item, planKey: item.planKey ?? groupKey });
+        }
+      }
     }
 
     // Deduplicate by id while preserving first-seen order

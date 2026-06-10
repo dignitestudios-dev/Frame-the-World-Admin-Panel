@@ -33,6 +33,7 @@ export default function UsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<UserStatus | "">("");
+  const [identityStatus, setIdentityStatus] = useState<string>("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deactivationUser, setDeactivationUser] = useState<User | null>(null);
@@ -50,6 +51,7 @@ export default function UsersPage() {
   const { data, isLoading, isFetching, refetch } = useUsers({
     search: debouncedSearch,
     status,
+    identityStatus,
     page,
     limit,
   });
@@ -87,13 +89,13 @@ export default function UsersPage() {
     setTogglingId(user._id);
     try {
       await unblockUser(user._id);
-      toast.success(`${user.name ?? user.email} has been activated.`);
+      toast.success("User status updated successfully");
 
       if (selectedUser?._id === user._id) {
         setSelectedUser((prev) => prev ? { ...prev, isActive: true, isDeactivatedByAdmin: false } : null);
       }
-    } catch {
-      toast.error("Failed to update account status. Please try again.");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to update user status");
     } finally {
       setTogglingId(null);
     }
@@ -104,13 +106,13 @@ export default function UsersPage() {
     setTogglingId(deactivationUser._id);
     try {
       await blockUser({ userId: deactivationUser._id, reason });
-      toast.success(`${deactivationUser.name ?? deactivationUser.email} has been deactivated.`);
+      toast.success("User status updated successfully");
 
       if (selectedUser?._id === deactivationUser._id) {
         setSelectedUser((prev) => prev ? { ...prev, isActive: false, isDeactivatedByAdmin: true } : null);
       }
-    } catch {
-      toast.error("Failed to update account status. Please try again.");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to update user status");
     } finally {
       setTogglingId(null);
       setDeactivationUser(null);
@@ -131,10 +133,12 @@ export default function UsersPage() {
           <UsersFilters
             search={searchInput}
             status={status}
+            identityStatus={identityStatus}
             isSearchPending={isSearchPending}
             isFetching={isFetching}
             onSearchChange={setSearchInput}
             onStatusChange={(v) => { setStatus(v); setPage(1); }}
+            onIdentityStatusChange={(v) => { setIdentityStatus(v); setPage(1); }}
           />
         </CardContent>
       </Card>

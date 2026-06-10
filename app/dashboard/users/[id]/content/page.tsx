@@ -28,9 +28,9 @@ const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  completed: { label: "Completed", className: "bg-emerald-500/15 text-emerald-600 border-emerald-200" },
-  pending:   { label: "Pending",   className: "bg-amber-500/15 text-amber-600 border-amber-200" },
-  flagged:   { label: "Flagged",   className: "bg-red-500/15 text-red-600 border-red-200" },
+  completed: { label: "Completed", className: "bg-white text-emerald-800 border-emerald-300" },
+  pending:   { label: "Pending",   className: "bg-white text-amber-700 border-amber-300" },
+  flagged:   { label: "Flagged",   className: "bg-white text-red-700 border-red-300" },
 };
 const getStatus = (s: string) =>
   STATUS_CONFIG[s.toLowerCase()] ?? { label: s, className: "bg-muted text-muted-foreground border-border" };
@@ -148,8 +148,8 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
             </div>
           </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent px-3 pb-2.5 pt-8">
-          <p className="truncate text-sm font-semibold text-white">{frame.title}</p>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-3 pb-2.5 pt-12">
+          <p title={frame.title} className="text-sm font-semibold text-white leading-snug line-clamp-2">{frame.title}</p>
         </div>
         <div className="absolute right-2 top-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
@@ -236,7 +236,7 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
             variant="ghost"
             size="icon"
             className="mt-0.5 shrink-0"
-            onClick={() => router.push(`/dashboard/users?userId=${id}`)}
+            onClick={() => router.push(`/dashboard/users`)}
           >
             <ArrowLeft className="size-4" />
           </Button>

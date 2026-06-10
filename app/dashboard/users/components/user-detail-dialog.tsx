@@ -53,12 +53,12 @@ const InfoRow = ({
   label: string;
   value: React.ReactNode;
 }) => (
-  <div className="flex items-center justify-between gap-4 py-2 border-b last:border-0">
-    <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+  <div className="flex items-start justify-between gap-4 py-2 border-b last:border-0">
+    <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0 mt-[2px]">
       {icon}
       <span>{label}</span>
     </div>
-    <div className="text-sm text-right font-medium">{value}</div>
+    <div className="text-sm text-right font-medium break-words break-all max-w-[60%] whitespace-normal min-w-0 line-clamp-3" title={typeof value === 'string' ? value : undefined}>{value}</div>
   </div>
 );
 
@@ -80,6 +80,15 @@ const DialogSkeletonContent = () => (
   </div>
 );
 
+const REVIEW_STATUSES = [
+  "pending",
+  "needs_review",
+  "verification_required",
+  "review",
+  "pending_verification",
+  "awaiting_review",
+] as const;
+
 interface UserDetailDialogProps {
   user: User | null;
   open: boolean;
@@ -88,6 +97,11 @@ interface UserDetailDialogProps {
   onClose: () => void;
   onToggleBlock: (user: User) => void;
 }
+
+const needsReview = (status?: string | null) => {
+  if (!status) return true; // treat null/undefined as needing review
+  return REVIEW_STATUSES.includes(status.toLowerCase() as typeof REVIEW_STATUSES[number]);
+};
 
 export const UserDetailDialog = ({
   user,
@@ -101,8 +115,8 @@ export const UserDetailDialog = ({
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const setStatusMutation = useSetUserStatus();
   const setStatus = setStatusMutation.mutateAsync;
-  const isSetting = (setStatusMutation as any).isPending ?? false;
-// console.log(isSetting)
+  const isSetting = setStatusMutation.status === "pending";
+
   const handleApprove = async () => {
     if (!user) return;
     try {
@@ -128,7 +142,7 @@ export const UserDetailDialog = ({
 
   return (
   <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-    <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <DialogContent className="max-w-lg p-4  max-h-[90vh] overflow-y-auto overflow-x-hidden">
       <DialogHeader>
         <DialogTitle>User Details</DialogTitle>
       </DialogHeader>
@@ -159,9 +173,11 @@ export const UserDetailDialog = ({
                 </p>
                 <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                 {user.bio && (
-                  <p className="mt-1 text-xs text-muted-foreground italic line-clamp-2">
+                  <div className="w-[350px] relative">
+                  <p className="mt-1 text-xs text-muted-foreground italic  break-words  whitespace-normal">
                     &ldquo;{user.bio}&rdquo;
                   </p>
+                  </div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <IdentityStatusBadge status={user.identityStatus ?? null} />
@@ -170,12 +186,12 @@ export const UserDetailDialog = ({
             </div>
 
             <div className="flex flex-col items-end gap-2">
-              {user.identityStatus === "pending" && (
+              {needsReview(user.identityStatus) && (
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={handleApprove} disabled={isSetting || showRejectDialog}>
+                  <Button className="cursor-pointer" size="sm" onClick={handleApprove} disabled={isSetting || showRejectDialog}>
                     Approve
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={() => setShowRejectDialog(true)} disabled={isSetting || showRejectDialog}>
+                  <Button className="cursor-pointer" size="sm" variant="destructive" onClick={() => setShowRejectDialog(true)} disabled={isSetting || showRejectDialog}>
                     Reject
                   </Button>
                 </div>
@@ -189,7 +205,9 @@ export const UserDetailDialog = ({
             className="w-full gap-2"
             onClick={() => {
               onClose();
-              router.push(`/dashboard/users/${user._id}/content`);
+              setTimeout(() => {
+                router.push(`/dashboard/users/${user._id}/content`);
+              }, 150);
             }}
           >
             <Images className="size-4" />
@@ -332,9 +350,9 @@ export const UserDetailDialog = ({
             <>
               <Separator />
               <Section title="Bio">
-                <div className="flex gap-2">
+                <div className="flex w-[450px] relative gap-2">
                   <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">{user.bio}</p>
+                  <p className="text-sm text-muted-foreground break-words break-all whitespace-normal flex-1 min-w-0">{user.bio}</p>
                 </div>
               </Section>
             </>

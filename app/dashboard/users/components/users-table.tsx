@@ -120,9 +120,9 @@ export const UsersTable = ({
                 </div>
               </TableCell>
               <TableCell>
-                <span className="text-sm">
+                <div className="text-sm line-clamp-2 break-all whitespace-normal max-w-[150px]">
                   {user.company?.name ?? <span className="text-muted-foreground">—</span>}
-                </span>
+                </div>
               </TableCell>
               <TableCell>
                 <div className="flex flex-col gap-0.5 text-xs">

@@ -21,7 +21,7 @@ import { useLoginMutation, type ApiError } from "@/lib/api/auth.api";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -91,7 +91,7 @@ const LoginPage = () => {
             {...register("email", { onChange: () => setApiError(null) })}
           />
           {errors.email && (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
+            <p className="text-sm text-destructive">Email is required</p>
           )}
         </div>
 

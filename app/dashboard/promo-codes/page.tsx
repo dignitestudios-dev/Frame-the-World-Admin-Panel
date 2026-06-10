@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import {
   BadgePercent,
@@ -8,14 +8,15 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Eye,
   Hash,
-  Infinity,
   Plus,
   RefreshCw,
-  Repeat2,
+  Search,
   ShieldAlert,
   Tag,
   Users,
+  X,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -51,11 +52,22 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const PROMO_CODE_MAX_LENGTH = 20;
+
 const fmtUnix = (ts: number) =>
   format(new Date(ts * 1000), "MMM d, yyyy");
 
 const fmtExpiry = (ts: number | null) =>
   ts ? fmtUnix(ts) : "No expiry";
+
+const planKeyLabel = (key?: string): string => {
+  if (!key) return "—";
+  const lower = key.toLowerCase();
+  if (lower === "monthly") return "Monthly";
+  if (lower === "yearly") return "Yearly";
+  // capitalise first letter for any other key
+  return key.charAt(0).toUpperCase() + key.slice(1);
+};
 
 // ─── Plan selector card ───────────────────────────────────────────────────────
 
@@ -161,7 +173,6 @@ function CreatePromoDialog({
   });
 
   const discountType = watch("discountType");
-  const duration = watch("duration");
 
   const handleClose = () => {
     reset();
@@ -169,7 +180,7 @@ function CreatePromoDialog({
     setSelectedPlan(null);
     onClose();
   };
-// console.log(p)
+
   const onSubmit = (values: PromoFormValues) => {
     if (!selectedPlan) return;
 
@@ -186,10 +197,6 @@ function CreatePromoDialog({
       payload.currency = selectedPlan.currency.toLowerCase();
     }
 
-    if (values.duration === "repeating" && values.durationInMonths) {
-      payload.durationInMonths = Number(values.durationInMonths);
-    }
-
     if (values.maxRedemptions) {
       payload.maxRedemptions = Number(values.maxRedemptions);
     }
@@ -204,10 +211,33 @@ function CreatePromoDialog({
         handleClose();
       },
       onError: (error: unknown) => {
-        const msg =
-          (error as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message;
-        toast.error(msg || "Failed to create promo code. Please try again.");
+        const axiosError = error as {
+          response?: { data?: { message?: string }; status?: number };
+        };
+        const rawMsg = axiosError?.response?.data?.message ?? "";
+        const status = axiosError?.response?.status;
+
+        // Friendly duplicate error
+        if (
+          status === 422 ||
+          rawMsg.toLowerCase().includes("already exists") ||
+          rawMsg.toLowerCase().includes("duplicate") ||
+          rawMsg.toLowerCase().includes("unprocessable")
+        ) {
+          // Try to determine if it's a duplicate-code error or a length error
+          if (
+            rawMsg.toLowerCase().includes("already exists") ||
+            rawMsg.toLowerCase().includes("duplicate")
+          ) {
+            toast.error("Promo code already exists. Please use a unique code.");
+          } else {
+            toast.error(
+              `Promo code cannot exceed ${PROMO_CODE_MAX_LENGTH} characters. Please shorten the code and try again.`
+            );
+          }
+        } else {
+          toast.error(rawMsg || "Failed to create promo code. Please try again.");
+        }
       },
     });
   };
@@ -326,16 +356,31 @@ function CreatePromoDialog({
 
             {/* Promo code */}
             <div className="space-y-1.5">
-              <Label>Promo Code <span className="text-destructive">*</span></Label>
+              <Label>
+                Promo Code <span className="text-destructive">*</span>
+              </Label>
               <Input
                 placeholder="e.g. SUMMER50"
                 className="uppercase"
+                maxLength={PROMO_CODE_MAX_LENGTH}
                 {...register("code", {
                   required: "Code is required",
-                  pattern: { value: /^[A-Za-z0-9_-]+$/, message: "Alphanumeric, hyphens, underscores only" },
+                  maxLength: {
+                    value: PROMO_CODE_MAX_LENGTH,
+                    message: `Promo code cannot exceed ${PROMO_CODE_MAX_LENGTH} characters.`,
+                  },
+                  pattern: {
+                    value: /^[A-Za-z0-9_-]+$/,
+                    message: "Alphanumeric, hyphens, underscores only",
+                  },
                 })}
               />
-              {errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}
+              <p className="text-[10px] text-muted-foreground text-right">
+                Max {PROMO_CODE_MAX_LENGTH} characters
+              </p>
+              {errors.code && (
+                <p className="text-xs text-destructive">{errors.code.message}</p>
+              )}
             </div>
 
             {/* Discount type */}
@@ -377,12 +422,15 @@ function CreatePromoDialog({
               </div>
               {discountType === "percent" ? (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Percent Off (1–100) <span className="text-destructive">*</span></Label>
+                  <Label className="text-xs">
+                    Percent Off (1–100) <span className="text-destructive">*</span>
+                  </Label>
                   <div className="relative">
                     <Input
                       type="number"
                       min={1}
                       max={100}
+                      step={1}
                       placeholder="e.g. 25"
                       className="pr-8"
                       {...register("percentOff", {
@@ -391,84 +439,50 @@ function CreatePromoDialog({
                         max: { value: 100, message: "Max 100" },
                       })}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      %
+                    </span>
                   </div>
-                  {errors.percentOff && <p className="text-xs text-destructive">{errors.percentOff.message}</p>}
+                  {errors.percentOff && (
+                    <p className="text-xs text-destructive">{errors.percentOff.message}</p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Amount Off (in {selectedPlan?.currency.toUpperCase()}) <span className="text-destructive">*</span></Label>
+                  <Label className="text-xs">
+                    Amount Off (in {selectedPlan?.currency.toUpperCase()}){" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      $
+                    </span>
                     <Input
                       type="number"
                       min={0.01}
                       step={0.01}
                       placeholder="e.g. 10.00"
                       className="pl-7"
-                      {...register("amountOff", { required: "Required", min: { value: 0.01, message: "Must be > 0" } })}
+                      {...register("amountOff", {
+                        required: "Required",
+                        min: { value: 0.01, message: "Must be > 0" },
+                        validate: (value) => {
+                          if (!selectedPlan) return true;
+                          const amount = Number(value);
+                          return (
+                            amount <= selectedPlan.displayPrice ||
+                            `Discount amount cannot exceed the subscription price of $${selectedPlan.displayPrice.toFixed(2)}.`
+                          );
+                        },
+                      })}
                     />
                   </div>
-                  {errors.amountOff && <p className="text-xs text-destructive">{errors.amountOff.message}</p>}
+                  {errors.amountOff && (
+                    <p className="text-xs text-destructive">{errors.amountOff.message}</p>
+                  )}
                 </div>
               )}
             </div>
-
-            <Separator />
-
-            {/* Duration */}
-            {/* <div className="space-y-2">
-              <Label>Duration <span className="text-destructive">*</span></Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Controller
-                  name="duration"
-                  control={control}
-                  render={({ field }) => (
-                    <>
-                      {(
-                        [
-                          { value: "once", label: "Once", icon: <Zap className="size-3.5" /> },
-                          { value: "forever", label: "Forever", icon: <Infinity className="size-3.5" /> },
-                          { value: "repeating", label: "Repeating", icon: <Repeat2 className="size-3.5" /> },
-                        ] as const
-                      ).map(({ value, label, icon }) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => field.onChange(value)}
-                          className={cn(
-                            "flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-xs font-medium transition-colors",
-                            field.value === value
-                              ? "border-primary bg-primary/5 text-primary"
-                              : "border-border text-muted-foreground hover:border-primary/40"
-                          )}
-                        >
-                          {icon}
-                          {label}
-                        </button>
-                      ))}
-                    </>
-                  )}
-                />
-              </div>
-              {duration === "repeating" && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Duration in Months <span className="text-destructive">*</span></Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="e.g. 3"
-                    {...register("durationInMonths", {
-                      required: duration === "repeating" ? "Required for repeating" : false,
-                      min: { value: 1, message: "Min 1 month" },
-                    })}
-                  />
-                  {errors.durationInMonths && (
-                    <p className="text-xs text-destructive">{errors.durationInMonths.message}</p>
-                  )}
-                </div>
-              )}
-            </div> */}
 
             <Separator />
 
@@ -482,11 +496,23 @@ function CreatePromoDialog({
                 <Input
                   type="number"
                   min={1}
+                  step={1}
                   placeholder="e.g. 100"
-                  {...register("maxRedemptions", { min: { value: 1, message: "Min 1" } })}
+                  {...register("maxRedemptions", {
+                    min: { value: 1, message: "Min 1" },
+                    validate: (value) => {
+                      if (!value) return true;
+                      if (!Number.isInteger(Number(value))) {
+                        return "Max Redemption must be a whole number.";
+                      }
+                      return true;
+                    },
+                  })}
                 />
                 {errors.maxRedemptions && (
-                  <p className="text-xs text-destructive">{errors.maxRedemptions.message}</p>
+                  <p className="text-xs text-destructive">
+                    {errors.maxRedemptions.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -502,7 +528,7 @@ function CreatePromoDialog({
                       const selected = new Date(v);
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      return selected > today || "Expiry date must be in the future";
+                      return selected > today || "Past dates are not allowed.";
                     },
                   })}
                 />
@@ -513,7 +539,12 @@ function CreatePromoDialog({
             </div>
 
             <DialogFooter className="gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(1)}
+                disabled={isPending}
+              >
                 Back
               </Button>
               <Button
@@ -541,7 +572,13 @@ function CreatePromoDialog({
 
 // ─── Promo code row ───────────────────────────────────────────────────────────
 
-function PromoRow({ promo }: { promo: PromoCode }) {
+function PromoRow({
+  promo,
+  onView,
+}: {
+  promo: PromoCode;
+  onView: (promo: PromoCode) => void;
+}) {
   const isExpired = promo.expiresAt ? promo.expiresAt * 1000 < Date.now() : false;
   const statusActive = promo.active && !isExpired;
   const pct = promo.maxRedemptions
@@ -577,17 +614,23 @@ function PromoRow({ promo }: { promo: PromoCode }) {
     promo.restrictions.minimum_amount > 0;
 
   return (
-    <div className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-150 hover:-translate-y-px hover:shadow-md sm:grid-cols-[auto_1fr_auto_auto_auto_auto]">
+    <div className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-150 hover:-translate-y-px hover:shadow-md sm:grid-cols-[auto_1fr_auto_auto_auto_auto_auto]">
       {/* Status dot */}
-      <div className={cn(
-        "size-2.5 rounded-full shrink-0",
-        statusActive ? "bg-emerald-500 shadow-[0_0_6px_2px_rgba(16,185,129,0.4)]" : "bg-muted-foreground/30"
-      )} />
+      <div
+        className={cn(
+          "size-2.5 rounded-full shrink-0",
+          statusActive
+            ? "bg-emerald-500 shadow-[0_0_6px_2px_rgba(16,185,129,0.4)]"
+            : "bg-muted-foreground/30"
+        )}
+      />
 
       {/* Code + meta */}
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm font-bold tracking-widest">{promo.code}</span>
+          <span className="font-mono text-sm font-bold tracking-widest">
+            {promo.code}
+          </span>
           <Badge
             variant="outline"
             className={cn(
@@ -599,13 +642,28 @@ function PromoRow({ promo }: { promo: PromoCode }) {
           >
             {statusActive ? "Active" : isExpired ? "Expired" : "Inactive"}
           </Badge>
+          {/* Subscription type badge */}
+          {promo.planKey && (
+            <Badge
+              variant="outline"
+              className="h-5 px-2 text-[10px] font-semibold border-violet-200 bg-violet-500/10 text-violet-600"
+            >
+              {planKeyLabel(promo.planKey)}
+            </Badge>
+          )}
           {hasFirstTimeOnly && (
-            <Badge variant="outline" className="h-5 px-2 text-[10px] font-semibold border-amber-200 bg-amber-500/10 text-amber-600">
+            <Badge
+              variant="outline"
+              className="h-5 px-2 text-[10px] font-semibold border-amber-200 bg-amber-500/10 text-amber-600"
+            >
               <ShieldAlert className="size-2.5 mr-1" /> First-time only
             </Badge>
           )}
           {hasMinAmount && (
-            <Badge variant="outline" className="h-5 px-2 text-[10px] font-semibold border-blue-200 bg-blue-500/10 text-blue-600">
+            <Badge
+              variant="outline"
+              className="h-5 px-2 text-[10px] font-semibold border-blue-200 bg-blue-500/10 text-blue-600"
+            >
               Min ${((promo.restrictions.minimum_amount ?? 0) / 100).toFixed(2)}{" "}
               {promo.restrictions.minimum_amount_currency?.toUpperCase()}
             </Badge>
@@ -623,10 +681,10 @@ function PromoRow({ promo }: { promo: PromoCode }) {
         </div>
       </div>
 
-      {/* Coupon ID — hidden on mobile */}
-      <div className="hidden sm:block text-center">
-        <p className="text-[10px] text-muted-foreground mb-0.5">Coupon</p>
-        <p className="font-mono text-xs font-medium">{promo?.code}</p>
+      {/* Subscription type — hidden on mobile */}
+      <div className="hidden sm:block text-center min-w-16">
+        <p className="text-[10px] text-muted-foreground mb-0.5">Plan</p>
+        <p className="text-xs font-medium">{planKeyLabel(promo.planKey)}</p>
       </div>
 
       {/* Redemptions */}
@@ -635,7 +693,9 @@ function PromoRow({ promo }: { promo: PromoCode }) {
         <p className="text-sm font-semibold">
           {promo.timesRedeemed}
           {promo.maxRedemptions ? (
-            <span className="text-muted-foreground font-normal">/{promo.maxRedemptions}</span>
+            <span className="text-muted-foreground font-normal">
+              /{promo.maxRedemptions}
+            </span>
           ) : (
             <span className="text-muted-foreground font-normal"> / ∞</span>
           )}
@@ -643,7 +703,14 @@ function PromoRow({ promo }: { promo: PromoCode }) {
         {pct !== null && (
           <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className={cn("h-full rounded-full transition-all", pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500")}
+              className={cn(
+                "h-full rounded-full transition-all",
+                pct >= 90
+                  ? "bg-red-500"
+                  : pct >= 60
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
+              )}
               style={{ width: `${Math.min(pct, 100)}%` }}
             />
           </div>
@@ -659,8 +726,16 @@ function PromoRow({ promo }: { promo: PromoCode }) {
         )}
       </div>
 
-      {/* Toggle */}
-      <div className="shrink-0">
+      {/* View + toggle */}
+      <div className="shrink-0 flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden sm:inline-flex gap-1.5"
+          onClick={() => onView(promo)}
+        >
+          <Eye className="size-3.5" /> View
+        </Button>
         <StatusToggle
           active={promo.active}
           loading={isToggling}
@@ -668,6 +743,205 @@ function PromoRow({ promo }: { promo: PromoCode }) {
         />
       </div>
     </div>
+  );
+}
+
+// ─── Promo Details Dialog ─────────────────────────────────────────────────────
+
+function PromoDetailsDialog({
+  open,
+  promo,
+  onClose,
+}: {
+  open: boolean;
+  promo: PromoCode | null;
+  onClose: () => void;
+}) {
+  if (!promo) return null;
+
+  const isExpired = promo.expiresAt ? promo.expiresAt * 1000 < Date.now() : false;
+  const statusActive = promo.active && !isExpired;
+
+  const discountLabel =
+    promo.discountType === "percent"
+      ? `${promo.percentOff ?? 0}%`
+      : promo.amountOff != null
+      ? `$${((promo.amountOff ?? 0) / 100).toFixed(2)}`
+      : "—";
+
+  const discountTypeLabel =
+    promo.discountType === "percent"
+      ? "Percentage"
+      : promo.discountType === "amount"
+      ? "Fixed Amount"
+      : "—";
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-brand-gradient">
+              <BadgePercent className="size-3.5 text-white" />
+            </div>
+            Promo Code Details
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Status header */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold",
+                  statusActive
+                    ? "border-emerald-200 bg-emerald-500/10 text-emerald-600"
+                    : "border-border bg-muted text-muted-foreground"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mr-1.5 inline-block size-1.5 rounded-full",
+                    statusActive ? "bg-emerald-500" : "bg-muted-foreground/50"
+                  )}
+                />
+                {statusActive ? "Active" : isExpired ? "Expired" : "Inactive"}
+              </Badge>
+              {promo.planKey && (
+                <Badge
+                  variant="outline"
+                  className="px-3 py-1 text-xs font-semibold border-violet-200 bg-violet-500/10 text-violet-600"
+                >
+                  {planKeyLabel(promo.planKey)} Plan
+                </Badge>
+              )}
+              <span className="text-xs text-muted-foreground ml-auto">
+                Created {fmtUnix(promo.created)}
+              </span>
+            </div>
+
+            {/* Core details grid */}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Promo Code</p>
+                <p className="font-mono font-bold tracking-widest">{promo.code}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Subscription Type</p>
+                <p className="font-semibold">{planKeyLabel(promo.planKey)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Discount Type</p>
+                <p className="font-semibold">{discountTypeLabel}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Discount Value</p>
+                <p className="font-semibold text-primary">{discountLabel}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Validity + redemptions */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border bg-card p-4 space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CalendarDays className="size-3" /> Validity
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Start: {fmtUnix(promo.created)}
+              </p>
+              <p className="font-semibold text-sm">
+                Expires: {fmtExpiry(promo.expiresAt)}
+              </p>
+            </div>
+            <div className="rounded-2xl border bg-card p-4 space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Users className="size-3" /> Redemptions
+              </p>
+              <p className="font-semibold text-sm">
+                {promo.timesRedeemed}
+                {promo.maxRedemptions
+                  ? ` / ${promo.maxRedemptions}`
+                  : " / ∞ (unlimited)"}
+              </p>
+              {promo.maxRedemptions && (
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      Math.round(
+                        (promo.timesRedeemed / promo.maxRedemptions) * 100
+                      ) >= 90
+                        ? "bg-red-500"
+                        : Math.round(
+                            (promo.timesRedeemed / promo.maxRedemptions) * 100
+                          ) >= 60
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                    )}
+                    style={{
+                      width: `${Math.min(
+                        Math.round(
+                          (promo.timesRedeemed / promo.maxRedemptions) * 100
+                        ),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Restrictions */}
+          <div className="rounded-2xl border bg-card p-4">
+            <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
+              <ShieldAlert className="size-3" /> Restrictions
+            </p>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                {promo.restrictions.first_time_transaction ? (
+                  <CheckCircle2 className="size-4 text-amber-500 shrink-0" />
+                ) : (
+                  <XCircle className="size-4 text-muted-foreground/40 shrink-0" />
+                )}
+                <span>
+                  {promo.restrictions.first_time_transaction
+                    ? "First-time transaction only"
+                    : "Applies to all customers"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {promo.restrictions.minimum_amount != null &&
+                promo.restrictions.minimum_amount > 0 ? (
+                  <>
+                    <CheckCircle2 className="size-4 text-blue-500 shrink-0" />
+                    <span>
+                      Minimum spend $
+                      {((promo.restrictions.minimum_amount ?? 0) / 100).toFixed(2)}{" "}
+                      {promo.restrictions.minimum_amount_currency?.toUpperCase()}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="size-4 text-muted-foreground/40 shrink-0" />
+                    <span>No minimum spend</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -690,13 +964,164 @@ const ListSkeleton = () => (
   </div>
 );
 
+// ─── Filter / Search bar ──────────────────────────────────────────────────────
+
+type StatusFilter = "all" | "active" | "expired" | "inactive";
+type PlanFilter = "all" | "monthly" | "yearly";
+
+function FilterBar({
+  search,
+  onSearch,
+  status,
+  onStatus,
+  plan,
+  onPlan,
+  onClear,
+  hasFilters,
+}: {
+  search: string;
+  onSearch: (v: string) => void;
+  status: StatusFilter;
+  onStatus: (v: StatusFilter) => void;
+  plan: PlanFilter;
+  onPlan: (v: PlanFilter) => void;
+  onClear: () => void;
+  hasFilters: boolean;
+}) {
+  const statusOptions: { value: StatusFilter; label: string }[] = [
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+    { value: "expired", label: "Expired" },
+  ];
+
+  const planOptions: { value: PlanFilter; label: string }[] = [
+    { value: "all", label: "All Plans" },
+    { value: "monthly", label: "Monthly" },
+    { value: "yearly", label: "Yearly" },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Search */}
+      <div className="relative flex-1 min-w-[180px]">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+        <Input
+          id="promo-search"
+          placeholder="Search by code…"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          className="pl-8 h-9 text-sm"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => onSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Status filter */}
+      <div className="flex items-center rounded-xl border bg-card overflow-hidden h-9">
+        {statusOptions.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onStatus(opt.value)}
+            className={cn(
+              "px-3 h-full text-xs font-medium transition-colors border-r last:border-r-0",
+              status === opt.value
+                ? "bg-primary text-white"
+                : "text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Plan filter */}
+      <div className="flex items-center rounded-xl border bg-card overflow-hidden h-9">
+        {planOptions.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onPlan(opt.value)}
+            className={cn(
+              "px-3 h-full text-xs font-medium transition-colors border-r last:border-r-0",
+              plan === opt.value
+                ? "bg-violet-600 text-white"
+                : "text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Clear */}
+      {hasFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-white"
+          onClick={onClear}
+        >
+          <X className="size-3.5" /> Clear filters
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PromoCodesPage() {
   const [createOpen, setCreateOpen] = useState(false);
+  const [selectedPromo, setSelectedPromo] = useState<PromoCode | null>(null);
 
-  const { data: promoCodes = [], isLoading, isFetching, refetch } = usePromoCodes();
-//  const promoCodes = promo
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
+
+  const { data: promoCodes = [], isLoading, isFetching, refetch } =
+    usePromoCodes();
+
+  // Derived filtered list
+  const filteredCodes = useMemo(() => {
+    return promoCodes.filter((p) => {
+      // Search
+      if (search && !p.code.toLowerCase().includes(search.toLowerCase())) {
+        return false;
+      }
+      // Status
+      if (statusFilter !== "all") {
+        const isExpired = p.expiresAt ? p.expiresAt * 1000 < Date.now() : false;
+        const isActive = p.active && !isExpired;
+        if (statusFilter === "active" && !isActive) return false;
+        if (statusFilter === "inactive" && (isActive || isExpired)) return false;
+        if (statusFilter === "expired" && !isExpired) return false;
+      }
+      // Plan
+      if (planFilter !== "all") {
+        if ((p.planKey ?? "").toLowerCase() !== planFilter) return false;
+      }
+      return true;
+    });
+  }, [promoCodes, search, statusFilter, planFilter]);
+
+  const hasFilters =
+    search !== "" || statusFilter !== "all" || planFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setPlanFilter("all");
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -770,8 +1195,27 @@ export default function PromoCodesPage() {
         )}
       </div>
 
+      {/* Search + Filters */}
+      {!isLoading && promoCodes.length > 0 && (
+        <FilterBar
+          search={search}
+          onSearch={setSearch}
+          status={statusFilter}
+          onStatus={setStatusFilter}
+          plan={planFilter}
+          onPlan={setPlanFilter}
+          onClear={clearFilters}
+          hasFilters={hasFilters}
+        />
+      )}
+
       {/* List */}
-      <div className={cn("space-y-3 transition-opacity", isFetching && !isLoading && "opacity-60")}>
+      <div
+        className={cn(
+          "space-y-3 transition-opacity",
+          isFetching && !isLoading && "opacity-60"
+        )}
+      >
         {isLoading ? (
           <ListSkeleton />
         ) : promoCodes.length === 0 ? (
@@ -791,17 +1235,42 @@ export default function PromoCodesPage() {
               <Plus className="size-4" /> Create First Code
             </Button>
           </div>
+        ) : filteredCodes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/30 py-16 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+              <Search className="size-5 text-muted-foreground" />
+            </div>
+            <p className="font-medium">No matching promo codes</p>
+            <p className="text-sm text-muted-foreground">
+              Try adjusting your search or filters.
+            </p>
+            <Button variant="outline" size="sm" className="mt-1" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </div>
         ) : (
           <div className="space-y-2">
-            {promoCodes?.map((p) => (
-              <PromoRow key={p.id} promo={p} />
+            {filteredCodes.map((p) => (
+              <PromoRow key={p.id} promo={p} onView={setSelectedPromo} />
             ))}
+            {hasFilters && (
+              <p className="text-center text-xs text-muted-foreground pt-1">
+                Showing {filteredCodes.length} of {promoCodes.length} promo codes
+              </p>
+            )}
           </div>
         )}
       </div>
 
       {/* Create dialog */}
       <CreatePromoDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {/* View details dialog */}
+      <PromoDetailsDialog
+        open={!!selectedPromo}
+        promo={selectedPromo}
+        onClose={() => setSelectedPromo(null)}
+      />
     </div>
   );
 }

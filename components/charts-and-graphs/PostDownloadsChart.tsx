@@ -92,7 +92,7 @@ export function PostDownloadsChart() {
     data?.map((point) => ({
       label: formatLabel(point._id, period),
       totalDownloads: point.totalDownloads,
-    })) ?? [];
+    })).filter((point) => point.totalDownloads > 0) ?? [];
 
   const total = chartData.reduce((sum, d) => sum + d.totalDownloads, 0);
   const maxVal = Math.max(...chartData.map((d) => d.totalDownloads), 0);
@@ -155,7 +155,7 @@ export function PostDownloadsChart() {
         )}
       </CardHeader>
 
-      <CardContent className="pb-5">
+      <CardContent className="pb-5 pt-2">
         {isLoading ? (
           <ChartSkeleton />
         ) : chartData.length === 0 ? (
@@ -163,13 +163,13 @@ export function PostDownloadsChart() {
             No data for this period
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="h-52 w-full">
+          <ChartContainer config={chartConfig} className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 layout="vertical"
                 data={chartData}
-                margin={{ left: 8, right: 36, top: 4, bottom: 4 }}
-                barCategoryGap="25%"
+                margin={{ left: 8, right: 60, top: 8, bottom: 8 }}
+                barCategoryGap="40%"
               >
                 <CartesianGrid
                   horizontal={false}
@@ -189,19 +189,20 @@ export function PostDownloadsChart() {
                   dataKey="label"
                   tickLine={false}
                   axisLine={false}
-                  tickMargin={6}
-                  width={64}
+                  tickMargin={8}
+                  width={72}
                   tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                 />
                 <ChartTooltip
                   cursor={{ fill: "var(--muted)", opacity: 0.4 }}
                   content={<ChartTooltipContent indicator="line" />}
                 />
-                <Bar dataKey="totalDownloads" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                <Bar dataKey="totalDownloads" radius={[0, 4, 4, 0]} maxBarSize={24}>
                   <LabelList
                     dataKey="totalDownloads"
                     position="right"
-                    style={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    offset={8}
+                    style={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 500 }}
                   />
                   {chartData.map((entry, i) => (
                     <Cell

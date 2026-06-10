@@ -1,38 +1,53 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ShieldCheck, Images, BookImage, RefreshCw,
-  ChevronLeft, ChevronRight, Lock, Globe, ImageIcon, CheckCircle2, Clock, ZoomIn,
+  ChevronLeft, ChevronRight, Lock, Globe, ImageIcon,
+  CheckCircle2, Clock, ZoomIn, Search, X, Filter,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
-import "yet-another-react-lightbox/styles.css";
+// import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { StatCard, StatCardSkeleton } from "@/components/stat-card";
 import { cn } from "@/lib/utils";
-import { usePosts, useFrames, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
+import {
+  usePosts,
+  useFrames,
+  type Post,
+  type Frame,
+  type ContentPagination,
+} from "@/lib/api/content.api";
 
 const PAGE_LIMIT = 12;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  completed: { label: "Completed", className: "bg-emerald-500/15 text-emerald-600 border-emerald-200" },
-  pending: { label: "Pending", className: "bg-amber-500/15 text-amber-600 border-amber-200" },
-  flagged: { label: "Flagged", className: "bg-red-500/15 text-red-600 border-red-200" },
+  completed: { label: "Completed", className: "bg-white text-emerald-800 border-emerald-300" },
+  pending:   { label: "Pending",   className: "bg-white text-amber-700 border-amber-300" },
+  flagged:   { label: "Flagged",   className: "bg-white text-red-700 border-red-300" },
 };
 const getStatus = (s: string) =>
-  STATUS_CONFIG[s.toLowerCase()] ?? { label: s, className: "bg-muted text-muted-foreground border-border" };
+  STATUS_CONFIG[s.toLowerCase()] ?? {
+    label: s,
+    className: "bg-white text-muted-foreground border-border",
+  };
 
 // ─── Skeleton grid ────────────────────────────────────────────────────────────
 
@@ -69,7 +84,8 @@ function Pager({ pagination, page, isFetching, onPage }: PagerProps) {
           {(page - 1) * pagination.itemsPerPage + 1}–
           {Math.min(page * pagination.itemsPerPage, pagination.totalItems)}
         </span>{" "}
-        of <span className="font-medium text-foreground">{pagination.totalItems}</span>
+        of{" "}
+        <span className="font-medium text-foreground">{pagination.totalItems}</span>
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -94,6 +110,106 @@ function Pager({ pagination, page, isFetching, onPage }: PagerProps) {
           Next <ChevronRight className="size-3.5" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ─── Search + filter bar ──────────────────────────────────────────────────────
+
+type PostStatusFilter = "all" | "completed" | "pending" | "flagged";
+type FrameVisibilityFilter = "all" | "public";
+
+function SearchBar({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative flex-1 min-w-[180px]">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="pl-9 h-9 text-sm"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FilterChips<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex items-center rounded-xl border bg-card overflow-hidden h-9 shrink-0">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            "px-3 h-full text-xs font-medium transition-colors border-r last:border-r-0",
+            value === opt.value
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:bg-muted/50"
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Empty states ─────────────────────────────────────────────────────────────
+
+function EmptyData({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/30 py-20 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+        <Icon className="size-5 text-muted-foreground" />
+      </div>
+      <p className="font-medium">{title}</p>
+      <p className="text-sm text-muted-foreground">{sub}</p>
+    </div>
+  );
+}
+
+function EmptySearch({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/30 py-16 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+        <Search className="size-5 text-muted-foreground" />
+      </div>
+      <p className="font-medium">No matching results</p>
+      <p className="text-sm text-muted-foreground">
+        Try adjusting your search or filters.
+      </p>
+      <Button variant="outline" size="sm" className="mt-1" onClick={onClear}>
+        Clear filters
+      </Button>
     </div>
   );
 }
@@ -125,15 +241,27 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
         </div>
         {/* Status overlay badge */}
         <div className="absolute left-2 top-2">
-          <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm", status.className)}>
-            {post.status === "completed" ? <CheckCircle2 className="size-2.5" /> : <Clock className="size-2.5" />}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm",
+              status.className
+            )}
+          >
+            {post.status === "completed" ? (
+              <CheckCircle2 className="size-2.5" />
+            ) : (
+              <Clock className="size-2.5" />
+            )}
             {status.label}
           </span>
         </div>
       </div>
 
       {/* Meta */}
-      <div className="p-3">
+      <div className="p-3 space-y-1">
+        {post.caption && (
+          <p className="text-[11px] text-foreground/80 line-clamp-1">{post.caption}</p>
+        )}
         <p className="text-[11px] text-muted-foreground">{fmtDate(post.createdAt)}</p>
       </div>
     </div>
@@ -171,8 +299,10 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
           </div>
         )}
         {/* Bottom gradient overlay */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent px-3 pb-2.5 pt-8">
-          <p className="truncate text-sm font-semibold text-white">{frame.title}</p>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-3 pb-2.5 pt-12">
+          <p title={frame.title} className="text-sm font-semibold text-white leading-snug line-clamp-2">
+            {frame.title}
+          </p>
         </div>
         {/* Top badges */}
         <div className="absolute right-2 top-2 flex gap-1.5">
@@ -190,13 +320,17 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
 
       {/* Meta */}
       <div className="flex items-center justify-between p-3">
-        <p className="text-[11px] text-muted-foreground">{fmtDate(frame.cover?.createdAt ?? "")}</p>
-        <span className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-          isClickable
-            ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground"
-        )}>
+        <p className="text-[11px] text-muted-foreground">
+          {fmtDate(frame.cover?.createdAt ?? "")}
+        </p>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            isClickable
+              ? "bg-primary/10 text-primary"
+              : "bg-muted text-muted-foreground"
+          )}
+        >
           <ImageIcon className="size-2.5" />
           {frame.totalPosts ?? 0} {frame.totalPosts === 1 ? "post" : "posts"}
         </span>
@@ -212,6 +346,13 @@ export default function ContentModerationPage() {
   const [postsPage, setPostsPage] = useState(1);
   const [framesPage, setFramesPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+
+  // Posts filters
+  const [postStatus, setPostStatus] = useState<PostStatusFilter>("all");
+
+  // Frames filters
+  const [frameSearch, setFrameSearch] = useState("");
+  const [frameVisibility, setFrameVisibility] = useState<FrameVisibilityFilter>("all");
 
   const {
     data: postsData,
@@ -232,7 +373,34 @@ export default function ContentModerationPage() {
   const isLoading = postsLoading || framesLoading;
   const isFetching = postsFetching || framesFetching;
 
-  const slides = posts
+  // ── Client-side filtering ──────────────────────────────────────────────────
+
+  const filteredPosts = useMemo(() => {
+    return posts.filter((p) => {
+      if (postStatus !== "all" && p.status.toLowerCase() !== postStatus) return false;
+      return true;
+    });
+  }, [posts, postStatus]);
+
+  const filteredFrames = useMemo(() => {
+    return frames.filter((f) => {
+      if (frameSearch) {
+        const q = frameSearch.toLowerCase();
+        if (!f.title?.toLowerCase().includes(q)) return false;
+      }
+      if (frameVisibility === "public" && f.isPrivate) return false;
+      return true;
+    });
+  }, [frames, frameSearch, frameVisibility]);
+
+  const hasPostFilters = postStatus !== "all";
+  const hasFrameFilters = frameSearch !== "" || frameVisibility !== "all";
+
+  const clearPostFilters = () => { setPostStatus("all"); };
+  const clearFrameFilters = () => { setFrameSearch(""); setFrameVisibility("all"); };
+
+  // Rebuild slide index from filtered posts for lightbox
+  const slides = filteredPosts
     .filter((p) => p.media?.location)
     .map((p) => ({ src: p.media!.location, alt: "Post image" }));
 
@@ -257,7 +425,9 @@ export default function ContentModerationPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Content Moderation</h1>
-            <p className="text-sm text-muted-foreground">Monitor and review posts and frames across the platform</p>
+            <p className="text-sm text-muted-foreground">
+              Monitor and review posts and frames across the platform
+            </p>
           </div>
         </div>
         <Button
@@ -298,7 +468,10 @@ export default function ContentModerationPage() {
             />
             <StatCard
               label="Total Content"
-              value={(postsData?.pagination.totalItems ?? 0) + (framesData?.pagination.totalItems ?? 0)}
+              value={
+                (postsData?.pagination.totalItems ?? 0) +
+                (framesData?.pagination.totalItems ?? 0)
+              }
               description="Posts + frames combined"
               icon={ShieldCheck}
               gradient
@@ -328,22 +501,51 @@ export default function ContentModerationPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Posts */}
+        {/* ── Posts tab ── */}
         <TabsContent value="posts" className="mt-6 space-y-4">
+          {/* Search + filter bar */}
+          {!postsLoading && posts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Filter className="size-3.5 text-muted-foreground" />
+              </div>
+              <FilterChips<PostStatusFilter>
+                value={postStatus}
+                onChange={setPostStatus}
+                options={[
+                  { value: "all",       label: "All" },
+                  { value: "completed", label: "Completed" },
+                  { value: "pending",   label: "Pending" },
+                  { value: "flagged",   label: "Flagged" },
+                ]}
+              />
+              {hasPostFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={clearPostFilters}
+                >
+                  <X className="size-3.5" /> Clear
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className={cn("transition-opacity", postsFetching && "opacity-60")}>
             {postsLoading ? (
               <GridSkeleton />
             ) : posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/30 py-20 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                  <Images className="size-5 text-muted-foreground" />
-                </div>
-                <p className="font-medium">No posts found</p>
-                <p className="text-sm text-muted-foreground">Posts will appear here once uploaded.</p>
-              </div>
+              <EmptyData
+                icon={Images}
+                title="No posts found"
+                sub="Posts will appear here once uploaded."
+              />
+            ) : filteredPosts.length === 0 ? (
+              <EmptySearch onClear={clearPostFilters} />
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {posts.reduce<{ el: React.ReactNode[]; idx: number }>(
+                {filteredPosts.reduce<{ el: React.ReactNode[]; idx: number }>(
                   (acc, post) => {
                     const slideIdx = post.media?.location ? acc.idx : -1;
                     acc.el.push(
@@ -361,48 +563,95 @@ export default function ContentModerationPage() {
               </div>
             )}
           </div>
+
+          {/* Result count when filtering */}
+          {hasPostFilters && filteredPosts.length > 0 && (
+            <p className="text-center text-xs text-muted-foreground">
+              Showing {filteredPosts.length} of {posts.length} posts on this page
+            </p>
+          )}
+
           <Pager
             pagination={postsData?.pagination}
             page={postsPage}
             isFetching={postsFetching}
-            onPage={setPostsPage}
+            onPage={(p) => { setPostsPage(p); clearPostFilters(); }}
           />
         </TabsContent>
 
-        {/* Frames */}
+        {/* ── Frames tab ── */}
         <TabsContent value="frames" className="mt-6 space-y-4">
+          {/* Search + filter bar */}
+          {!framesLoading && frames.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchBar
+                id="frame-search"
+                value={frameSearch}
+                onChange={setFrameSearch}
+                placeholder="Search by frame title…"
+              />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Filter className="size-3.5 text-muted-foreground" />
+              </div>
+              <FilterChips<FrameVisibilityFilter>
+                value={frameVisibility}
+                onChange={setFrameVisibility}
+                options={[]}
+              />
+              {hasFrameFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={clearFrameFilters}
+                >
+                  <X className="size-3.5" /> Clear
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className={cn("transition-opacity", framesFetching && "opacity-60")}>
             {framesLoading ? (
               <GridSkeleton />
             ) : frames.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/30 py-20 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                  <BookImage className="size-5 text-muted-foreground" />
-                </div>
-                <p className="font-medium">No frames found</p>
-                <p className="text-sm text-muted-foreground">Frames will appear here once created.</p>
-              </div>
+              <EmptyData
+                icon={BookImage}
+                title="No frames found"
+                sub="Frames will appear here once created."
+              />
+            ) : filteredFrames.length === 0 ? (
+              <EmptySearch onClear={clearFrameFilters} />
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {frames.map((frame) => (
+                {filteredFrames.map((frame) => (
                   <FrameCard
                     key={frame._id}
                     frame={frame}
-                    onClick={() => router.push(`/dashboard/frames/${frame._id}/posts`)}
+                    onClick={() =>
+                      router.push(`/dashboard/frames/${frame._id}/posts`)
+                    }
                   />
                 ))}
               </div>
             )}
           </div>
+
+          {/* Result count when filtering */}
+          {hasFrameFilters && filteredFrames.length > 0 && (
+            <p className="text-center text-xs text-muted-foreground">
+              Showing {filteredFrames.length} of {frames.length} frames on this page
+            </p>
+          )}
+
           <Pager
             pagination={framesData?.pagination}
             page={framesPage}
             isFetching={framesFetching}
-            onPage={setFramesPage}
+            onPage={(p) => { setFramesPage(p); clearFrameFilters(); }}
           />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-

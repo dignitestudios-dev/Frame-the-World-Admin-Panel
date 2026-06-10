@@ -77,6 +77,7 @@ export interface UsersResponse {
 export interface UsersParams {
   search?: string;
   status?: UserStatus | "";
+  identityStatus?: string;
   page?: number;
   limit?: number;
 }
@@ -101,6 +102,7 @@ const fetchUsers = async (params: UsersParams): Promise<UsersResponse> => {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.status) query.set("status", params.status);
+  if (params.identityStatus) query.set("identityStatus", params.identityStatus);
   if (params.page) query.set("page", String(params.page));
   if (params.limit) query.set("limit", String(params.limit));
 
@@ -135,8 +137,13 @@ interface StatusPayload {
 const updateUserStatus = (userId: string, payload: StatusPayload) =>
   API.patch(`/users/${userId}/status`, payload);
 
-const setUserStatus = (opts: { userId: string; status: "approved" | "rejected"; rejectionReason?: string | null }) =>
-  updateUserStatus(opts.userId, { status: opts.status, rejectionReason: opts.rejectionReason ?? null });
+const setUserStatus = (opts: { userId: string; status: "approved" | "rejected"; rejectionReason?: string | null }) => {
+  const payload: StatusPayload = { status: opts.status };
+  if (opts.status === "rejected") {
+    payload.rejectionReason = opts.rejectionReason ?? null;
+  }
+  return updateUserStatus(opts.userId, payload);
+}
 
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

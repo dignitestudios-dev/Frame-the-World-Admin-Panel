@@ -14,23 +14,27 @@ import type { UserStatus } from "@/lib/api/users.api";
 interface UsersFiltersProps {
   search: string;
   status: UserStatus | "";
+  identityStatus: string;
   isSearchPending: boolean;
   isFetching: boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: UserStatus | "") => void;
+  onIdentityStatusChange: (value: string) => void;
 }
 
 export const UsersFilters = ({
   search,
   status,
+  identityStatus,
   isSearchPending,
   isFetching,
   onSearchChange,
   onStatusChange,
+  onIdentityStatusChange,
 }: UsersFiltersProps) => (
   <div className="flex flex-wrap items-center justify-end gap-2">
     {/* Active filter chips */}
-    {(search || status) && (
+    {(search || status || identityStatus) && (
       <div className="flex flex-wrap items-center gap-2 mr-auto">
         {search && (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
@@ -48,8 +52,33 @@ export const UsersFilters = ({
             </button>
           </span>
         )}
+        {identityStatus && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary capitalize">
+            {identityStatus.replace("_", " ")}
+            <button onClick={() => onIdentityStatusChange("")} className="ml-1 hover:opacity-70">
+              <X className="size-3" />
+            </button>
+          </span>
+        )}
       </div>
     )}
+
+    {/* Identity Status filter */}
+    <Select
+      value={identityStatus || "all"}
+      onValueChange={(v) => onIdentityStatusChange(v === "all" ? "" : v)}
+      disabled={isFetching}
+    >
+      <SelectTrigger className="h-9 w-[160px]">
+        <SelectValue placeholder="All Identities" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Any Identity Status</SelectItem>
+        <SelectItem value="approved">Identity: Approved</SelectItem>
+        <SelectItem value="pending">Identity: Pending</SelectItem>
+        <SelectItem value="rejected">Identity: Rejected</SelectItem>
+      </SelectContent>
+    </Select>
 
     {/* Status filter */}
     <Select
