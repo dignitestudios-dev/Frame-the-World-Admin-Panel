@@ -1,9 +1,8 @@
 "use client";
 
-import { Crown, Download, RefreshCw, ThumbsUp, Trophy, User } from "lucide-react";
+import { Crown, Download, RefreshCw, ThumbsUp, Trophy, User as UserIcon } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useLeaderboard, type UpvotedEntry, type DownloadedEntry } from "@/lib/api/leaderboard.api";
 import type { LeaderboardUser } from "@/lib/api/leaderboard.api";
+import { toast } from "sonner";
+import { UserDetailDialog } from "../users/components/user-detail-dialog";
+import DeactivationReasonDialog from "../users/components/deactivation-reason-dialog";
+import { useUserById, useBlockUser, useUnblockUser } from "@/lib/api/users.api";
+import type { User } from "@/lib/api/users.api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,7 +48,7 @@ function PodiumAvatar({ user, size, ringClass }: PodiumAvatarProps) {
         />
       ) : (
         <div className={cn("size-full flex items-center justify-center font-bold bg-brand-gradient text-white", textClass)}>
-          {user ? getInitials(user.name) : <User className="size-4 opacity-60" />}
+          {user ? getInitials(user.name) : <UserIcon className="size-4 opacity-60" />}
         </div>
       )}
     </div>
@@ -317,12 +321,56 @@ function LeaderboardPanel({ entries, scoreKey, scoreLabel, icon, isLoading, onNa
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
-  const router = useRouter();
   const { data, isLoading, isFetching, refetch } = useLeaderboard();
   const [tab, setTab] = useState<"upvotes" | "downloads">("upvotes");
 
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const { data: selectedUser, isFetching: isUserFetching } = useUserById(selectedUserId);
+  
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deactivationUser, setDeactivationUser] = useState<User | null>(null);
+  
+  const { mutateAsync: blockUser } = useBlockUser();
+  const { mutateAsync: unblockUser } = useUnblockUser();
+
   const handleNavigate = (userId: string) => {
-    router.push(`/dashboard/users?userId=${userId}`);
+    setSelectedUserId(userId);
+  };
+
+  const handleToggleBlock = async (user: User) => {
+    const currentlyActive =
+      typeof user.isDeactivatedByAdmin === "boolean"
+        ? !user.isDeactivatedByAdmin
+        : user.isActive;
+
+    if (currentlyActive) {
+      setDeactivationUser(user);
+      return;
+    }
+
+    setTogglingId(user._id);
+    try {
+      await unblockUser(user._id);
+      toast.success("User status updated successfully");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to update user status");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const handleConfirmDeactivation = async (reason: string | null) => {
+    if (!deactivationUser) return;
+    setTogglingId(deactivationUser._id);
+    try {
+      await blockUser({ userId: deactivationUser._id, reason });
+      toast.success("User status updated successfully");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to update user status");
+    } finally {
+      setTogglingId(null);
+      setDeactivationUser(null);
+    }
   };
 
   return (
@@ -383,6 +431,23 @@ export default function LeaderboardPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <UserDetailDialog
+        user={selectedUser || null}
+        open={Boolean(selectedUserId)}
+        isLoading={isUserFetching}
+        togglingId={togglingId}
+        onClose={() => setSelectedUserId(null)}
+        onToggleBlock={handleToggleBlock}
+      />
+
+      <DeactivationReasonDialog
+        open={Boolean(deactivationUser)}
+        initial=""
+        submitting={Boolean(togglingId && deactivationUser && togglingId === deactivationUser._id)}
+        onClose={() => setDeactivationUser(null)}
+        onConfirm={handleConfirmDeactivation}
+      />
     </div>
   );
 }

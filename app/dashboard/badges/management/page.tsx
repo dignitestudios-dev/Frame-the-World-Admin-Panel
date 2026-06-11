@@ -331,7 +331,7 @@ export default function BadgesManagementPage() {
             <div className="flex size-14 items-center justify-center rounded-full bg-muted">
               <Sparkles className="size-6 text-muted-foreground" />
             </div>
-            <p className="font-medium">No badges found</p>
+            <p className="font-medium">No Badges Found</p>
             <p className="text-sm text-muted-foreground">Badges will appear here once created.</p>
           </div>
         ) : (

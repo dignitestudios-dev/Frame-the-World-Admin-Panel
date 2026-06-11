@@ -116,7 +116,7 @@ export default function BadgesPage() {
               <div className="flex size-12 items-center justify-center rounded-full bg-muted">
                 <Award className="size-5 text-muted-foreground" />
               </div>
-              <p className="font-medium">No badge data yet</p>
+              <p className="font-medium">No Badge Data Yet</p>
               <p className="text-sm text-muted-foreground">Users will appear here once badges are earned.</p>
             </div>
           ) : (

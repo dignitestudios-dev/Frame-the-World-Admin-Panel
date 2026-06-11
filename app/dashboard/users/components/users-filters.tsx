@@ -73,10 +73,10 @@ export const UsersFilters = ({
         <SelectValue placeholder="All Identities" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">Any Identity Status</SelectItem>
-        <SelectItem value="approved">Identity: Approved</SelectItem>
-        <SelectItem value="pending">Identity: Pending</SelectItem>
-        <SelectItem value="rejected">Identity: Rejected</SelectItem>
+        <SelectItem value="all">All</SelectItem>
+        <SelectItem value="approved">Approved</SelectItem>
+        <SelectItem value="pending">Pending</SelectItem>
+        <SelectItem value="rejected">Rejected</SelectItem>
       </SelectContent>
     </Select>
 

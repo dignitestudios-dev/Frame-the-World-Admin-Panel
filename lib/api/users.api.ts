@@ -101,8 +101,14 @@ interface UserByIdResponse {
 const fetchUsers = async (params: UsersParams): Promise<UsersResponse> => {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
-  if (params.status) query.set("status", params.status);
+  
+  // Map frontend activated/deactivated to backend isDeactivatedByAdmin
+  if (params.status === "activated") query.set("isDeactivatedByAdmin", "false");
+  if (params.status === "deactivated") query.set("isDeactivatedByAdmin", "true");
+  
+  // Map frontend identityStatus to backend status
   if (params.identityStatus) query.set("identityStatus", params.identityStatus);
+  
   if (params.page) query.set("page", String(params.page));
   if (params.limit) query.set("limit", String(params.limit));
 

@@ -1223,7 +1223,7 @@ export default function PromoCodesPage() {
             <div className="flex size-14 items-center justify-center rounded-full bg-muted">
               <BadgePercent className="size-6 text-muted-foreground" />
             </div>
-            <p className="font-medium">No promo codes yet</p>
+            <p className="font-medium">No Promo Codes Yet</p>
             <p className="text-sm text-muted-foreground">
               Create your first promo code to start offering discounts.
             </p>

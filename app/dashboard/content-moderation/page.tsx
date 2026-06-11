@@ -538,7 +538,7 @@ export default function ContentModerationPage() {
             ) : posts.length === 0 ? (
               <EmptyData
                 icon={Images}
-                title="No posts found"
+                title="No Posts Found"
                 sub="Posts will appear here once uploaded."
               />
             ) : filteredPosts.length === 0 ? (
@@ -617,7 +617,7 @@ export default function ContentModerationPage() {
             ) : frames.length === 0 ? (
               <EmptyData
                 icon={BookImage}
-                title="No frames found"
+                title="No Frames Found"
                 sub="Frames will appear here once created."
               />
             ) : filteredFrames.length === 0 ? (

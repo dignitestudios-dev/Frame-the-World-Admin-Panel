@@ -202,7 +202,7 @@ export function PostUpvotesChart() {
           <ChartSkeleton />
         ) : chartData.length === 0 ? (
           <div className="flex h-52 items-center justify-center text-sm text-muted-foreground">
-            No data for this period
+            No Data For This Period
           </div>
         ) : (
           <ChartContainer config={chartConfig} className="h-52 w-full">

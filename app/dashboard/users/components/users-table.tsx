@@ -64,7 +64,7 @@ const EmptyState = () => (
         <div className="flex size-12 items-center justify-center rounded-full bg-muted">
           <SearchX className="size-5 text-muted-foreground" />
         </div>
-        <p className="font-medium">No users found</p>
+        <p className="font-medium">No Users Found</p>
         <p className="text-sm text-muted-foreground">Try adjusting your search or filter.</p>
       </div>
     </TableCell>
