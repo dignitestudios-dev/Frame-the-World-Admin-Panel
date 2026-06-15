@@ -155,7 +155,7 @@ export const UserDetailDialog = ({
             <UserX className="size-5 text-muted-foreground" />
           </div>
           <p className="font-medium">User not available</p>
-        </div>
+        </div> 
       ) : (
         <div className="space-y-5">
           {/* ── Profile header ── */}
