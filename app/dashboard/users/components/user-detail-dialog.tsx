@@ -155,7 +155,7 @@ export const UserDetailDialog = ({
             <UserX className="size-5 text-muted-foreground" />
           </div>
           <p className="font-medium">User not available</p>
-        </div>
+        </div> 
       ) : (
         <div className="space-y-5">
           {/* ── Profile header ── */}
@@ -173,10 +173,10 @@ export const UserDetailDialog = ({
                 </p>
                 <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                 {user.bio && (
-                  <div className="w-[350px] relative">
-                  <p className="mt-1 text-xs text-muted-foreground italic  break-words  whitespace-normal">
-                    &ldquo;{user.bio}&rdquo;
-                  </p>
+                  <div className="relative min-w-0 max-w-[350px]">
+                    <p className="mt-1 text-xs text-muted-foreground italic break-words whitespace-normal">
+                      &ldquo;{user.bio}&rdquo;
+                    </p>
                   </div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -350,7 +350,7 @@ export const UserDetailDialog = ({
             <>
               <Separator />
               <Section title="Bio">
-                <div className="flex w-[450px] relative gap-2">
+                <div className="flex relative gap-2 min-w-0">
                   <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground break-words break-all whitespace-normal flex-1 min-w-0">{user.bio}</p>
                 </div>
