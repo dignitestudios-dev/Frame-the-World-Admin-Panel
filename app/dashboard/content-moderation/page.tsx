@@ -11,7 +11,7 @@ import {
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
-// import "yet-another-react-lightbox/styles.css";
+import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -40,8 +40,8 @@ const fmtDate = (iso: string) =>
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   completed: { label: "Completed", className: "bg-white text-emerald-800 border-emerald-300" },
-  pending:   { label: "Pending",   className: "bg-white text-amber-700 border-amber-300" },
-  flagged:   { label: "Flagged",   className: "bg-white text-red-700 border-red-300" },
+  pending: { label: "Pending", className: "bg-white text-amber-700 border-amber-300" },
+  flagged: { label: "Flagged", className: "bg-white text-red-700 border-red-300" },
 };
 const getStatus = (s: string) =>
   STATUS_CONFIG[s.toLowerCase()] ?? {
@@ -513,10 +513,9 @@ export default function ContentModerationPage() {
                 value={postStatus}
                 onChange={setPostStatus}
                 options={[
-                  { value: "all",       label: "All" },
+                  { value: "all", label: "All" },
                   { value: "completed", label: "Completed" },
-                  { value: "pending",   label: "Pending" },
-                  { value: "flagged",   label: "Flagged" },
+                  { value: "pending", label: "Pending" },
                 ]}
               />
               {hasPostFilters && (
