@@ -51,9 +51,10 @@ export interface PromoCode {
   planLabel?: string;
   /** "monthly" | "yearly" — derived from API response group key */
   planKey?: string;
-  discountType?: DiscountType;
+  discountType?: DiscountType | "percentOff" | "amountOff";
   percentOff?: number;
   amountOff?: number;
+  discountValue?: number;
   currency?: string;
 }
 
@@ -90,6 +91,8 @@ export interface CreatePromoCodePayload {
 export const promoKeys = {
   plans: ["promo", "plans"] as const,
   list: ["promo", "codes"] as const,
+  listPage: (page?: number, limit?: number) =>
+    page && limit ? (["promo", "codes", page, limit] as const) : (["promo", "codes"] as const),
 };
 
 // ─── API functions ────────────────────────────────────────────────────────────
@@ -99,26 +102,62 @@ const fetchPlans = async (): Promise<Plan[]> => {
   return data.data.plans;
 };
 
-const fetchPromoCodes = async (): Promise<PromoCode[]> => {
+export interface FetchPromoCodesResult {
+  promoCodes: PromoCode[];
+  pagination?: {
+    itemsPerPage: number;
+    currentPage: number;
+    totalItems: number;
+    totalPages: number;
+  };
+}
+
+const fetchPromoCodes = async (
+  page?: number,
+  limit?: number
+): Promise<FetchPromoCodesResult> => {
+  const params: Record<string, any> = {};
+  if (page) params.page = page;
+  if (limit) params.limit = limit;
+
   const { data } = await API.get<PromoCodesResponse>(
-    "/subscriptions/stripe/promo-code"
+    "/subscriptions/stripe/promo-code",
+    { params }
   );
+
+  // Helper to map and normalize the promo code objects, ensuring both old and new discount fields are present/consistent
+  const mapPromoCode = (item: any): PromoCode => {
+    const mapped = { ...item };
+
+    // If discountType is percentOff or amountOff, map them to percent/amount for backward compatibility
+    if (mapped.discountType === "percentOff") {
+      mapped.percentOff = mapped.discountValue ?? mapped.percentOff;
+    } else if (mapped.discountType === "amountOff") {
+      mapped.amountOff = mapped.discountValue ?? mapped.amountOff;
+    } else if (mapped.discountType === "percent" && mapped.discountValue === undefined) {
+      mapped.discountValue = mapped.percentOff;
+    } else if (mapped.discountType === "amount" && mapped.discountValue === undefined) {
+      mapped.discountValue = mapped.amountOff;
+    }
+
+    return mapped;
+  };
+
+  let promoCodes: PromoCode[] = [];
 
   // Support multiple response shapes:
   // - { data: PromoCode[] }
   // - { data: { monthly: PromoCode[], yearly: PromoCode[], ... }, pagination: {...} }
-  if (Array.isArray(data.data)) return data.data as PromoCode[];
-
-  // If data.data is an object with groups (monthly, yearly, ...), merge all arrays
-  // and stamp each item with its group key so the UI can show "Monthly" / "Yearly"
-  if (data.data && typeof data.data === "object") {
+  if (Array.isArray(data.data)) {
+    promoCodes = (data.data as any[]).map(mapPromoCode);
+  } else if (data.data && typeof data.data === "object") {
     const grouped = data.data as Record<string, PromoCode[] | undefined>;
     const combined: PromoCode[] = [];
 
     for (const [groupKey, items] of Object.entries(grouped)) {
       if (Array.isArray(items)) {
         for (const item of items) {
-          combined.push({ ...item, planKey: item.planKey ?? groupKey });
+          combined.push(mapPromoCode({ ...item, planKey: item.planKey ?? groupKey }));
         }
       }
     }
@@ -128,11 +167,13 @@ const fetchPromoCodes = async (): Promise<PromoCode[]> => {
     for (const p of combined) {
       if (!seen.has(p.id)) seen.set(p.id, p);
     }
-    return Array.from(seen.values());
+    promoCodes = Array.from(seen.values());
   }
 
-  // Fallback: return empty list
-  return [];
+  return {
+    promoCodes,
+    pagination: data.pagination,
+  };
 };
 
 const createPromoCode = async (
@@ -165,10 +206,10 @@ export const usePlans = () =>
     staleTime: 1000 * 60 * 10,
   });
 
-export const usePromoCodes = () =>
+export const usePromoCodes = (page?: number, limit?: number) =>
   useQuery({
-    queryKey: promoKeys.list,
-    queryFn: fetchPromoCodes,
+    queryKey: promoKeys.listPage(page, limit),
+    queryFn: () => fetchPromoCodes(page, limit),
     staleTime: 1000 * 60 * 2,
   });
 

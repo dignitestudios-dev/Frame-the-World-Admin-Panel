@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import {
   BadgePercent,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Eye,
@@ -35,6 +36,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { StatCard, StatCardSkeleton } from "@/components/stat-card";
 import { StatusToggle } from "@/app/dashboard/users/components/status-toggle";
@@ -762,19 +770,22 @@ function PromoDetailsDialog({
   const isExpired = promo.expiresAt ? promo.expiresAt * 1000 < Date.now() : false;
   const statusActive = promo.active && !isExpired;
 
-  const discountLabel =
-    promo.discountType === "percent"
-      ? `${promo.percentOff ?? 0}%`
-      : promo.amountOff != null
-      ? `$${((promo.amountOff ?? 0) / 100).toFixed(2)}`
-      : "—";
+  const isPercent =
+    promo.discountType === "percent" || promo.discountType === "percentOff";
+  const isAmount =
+    promo.discountType === "amount" || promo.discountType === "amountOff";
 
-  const discountTypeLabel =
-    promo.discountType === "percent"
-      ? "Percentage"
-      : promo.discountType === "amount"
-      ? "Fixed Amount"
-      : "—";
+  const discountLabel = isPercent
+    ? `${promo.discountValue ?? promo.percentOff ?? 0}%`
+    : isAmount
+    ? `$${((promo.discountValue ?? promo.amountOff ?? 0) / 100).toFixed(2)}`
+    : "—";
+
+  const discountTypeLabel = isPercent
+    ? "Percentage"
+    : isAmount
+    ? "Fixed Amount"
+    : "—";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -945,6 +956,140 @@ function PromoDetailsDialog({
   );
 }
 
+// ─── Pagination ───────────────────────────────────────────────────────────────
+
+interface PromoCodesPaginationBarProps {
+  pagination: {
+    itemsPerPage: number;
+    currentPage: number;
+    totalItems: number;
+    totalPages: number;
+  } | undefined;
+  page: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  isFetching?: boolean;
+}
+
+function PromoCodesPaginationBar({
+  pagination,
+  page,
+  limit,
+  onPageChange,
+  onLimitChange,
+  isFetching = false,
+}: PromoCodesPaginationBarProps) {
+  const [gotoInput, setGotoInput] = useState("");
+  const totalPages = pagination?.totalPages ?? 1;
+  const currentPage = pagination?.currentPage ?? page;
+  const totalItems = pagination?.totalItems ?? 0;
+  const start = totalItems === 0 ? 0 : (currentPage - 1) * limit + 1;
+  const end = Math.min(currentPage * limit, totalItems);
+
+  const gotoValue = parseInt(gotoInput, 10);
+  const isGotoInvalid =
+    gotoInput !== "" && (!gotoValue || gotoValue < 1 || gotoValue > totalPages);
+
+  const handleGotoChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "");
+    if (digits === "") {
+      setGotoInput("");
+      return;
+    }
+    const num = parseInt(digits, 10);
+    setGotoInput(String(Math.min(num, totalPages)));
+  };
+
+  const handleGoto = () => {
+    const parsed = parseInt(gotoInput, 10);
+    if (!parsed || parsed < 1) return;
+    onPageChange(Math.min(parsed, totalPages));
+    setGotoInput("");
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
+      {/* Left: rows per page + count */}
+      <div className="flex items-center gap-3">
+        <p className="text-sm text-muted-foreground">Rows per page</p>
+        <Select
+          value={String(limit)}
+          onValueChange={(v) => {
+            onLimitChange(Number(v));
+            onPageChange(1);
+          }}
+        >
+          <SelectTrigger className="h-9 w-20">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[10, 20, 30, 50].map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {totalItems > 0 && (
+          <span className="text-sm text-muted-foreground">
+            {start}–{end} of {totalItems.toLocaleString()}
+          </span>
+        )}
+      </div>
+
+      {/* Right: nav + goto */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-9 hover:text-white"
+          disabled={currentPage <= 1 || isFetching}
+          onClick={() => onPageChange(currentPage - 1)}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-9 hover:text-white"
+          disabled={currentPage >= totalPages || isFetching}
+          onClick={() => onPageChange(currentPage + 1)}
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+
+        {/* Go to page */}
+        <div className="flex items-center gap-2">
+          <Input
+            value={gotoInput}
+            onChange={(e) => handleGotoChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGoto()}
+            placeholder={`1–${totalPages}`}
+            className={`h-9 w-20 text-center ${
+              isGotoInvalid
+                ? "border-destructive focus-visible:ring-destructive"
+                : ""
+            }`}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 hover:text-white"
+            onClick={handleGoto}
+            disabled={isGotoInvalid || gotoInput === "" || isFetching}
+          >
+            Go
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Skeleton list ────────────────────────────────────────────────────────────
 
 const ListSkeleton = () => (
@@ -1083,13 +1228,31 @@ export default function PromoCodesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedPromo, setSelectedPromo] = useState<PromoCode | null>(null);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
   // Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
 
-  const { data: promoCodes = [], isLoading, isFetching, refetch } =
-    usePromoCodes();
+  const { data, isLoading, isFetching, refetch } = usePromoCodes(page, limit);
+  const promoCodes = data?.promoCodes ?? [];
+  const pagination = data?.pagination;
+
+  // Stats local state to avoid skeletons during page transitions
+  const [stats, setStats] = useState<{ total: number; active: number; inactive: number } | null>(null);
+
+  useEffect(() => {
+    if (data) {
+      setStats({
+        total: data.pagination?.totalItems ?? data.promoCodes.length,
+        active: data.promoCodes.filter((p) => p.active).length,
+        inactive: data.promoCodes.filter((p) => !p.active).length,
+      });
+    }
+  }, [data]);
 
   // Derived filtered list
   const filteredCodes = useMemo(() => {
@@ -1117,10 +1280,26 @@ export default function PromoCodesPage() {
   const hasFilters =
     search !== "" || statusFilter !== "all" || planFilter !== "all";
 
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (val: StatusFilter) => {
+    setStatusFilter(val);
+    setPage(1);
+  };
+
+  const handlePlanFilterChange = (val: PlanFilter) => {
+    setPlanFilter(val);
+    setPage(1);
+  };
+
   const clearFilters = () => {
     setSearch("");
     setStatusFilter("all");
     setPlanFilter("all");
+    setPage(1);
   };
 
   return (
@@ -1161,7 +1340,7 @@ export default function PromoCodesPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {isLoading ? (
+        {!stats ? (
           <>
             <StatCardSkeleton />
             <StatCardSkeleton />
@@ -1171,25 +1350,25 @@ export default function PromoCodesPage() {
           <>
             <StatCard
               label="Total Codes"
-              value={promoCodes?.length}
+              value={stats.total}
               icon={Hash}
               gradient
             />
             <StatCard
               label="Active"
-              value={promoCodes?.filter((p) => p.active).length}
+              value={stats.active}
               icon={CheckCircle2}
               iconBg="bg-emerald-500/10"
               iconColor="text-emerald-600"
-              description="Currently active promo codes"
+              description={pagination ? "Active codes on this page" : "Currently active promo codes"}
             />
             <StatCard
               label="Inactive"
-              value={promoCodes?.filter((p) => !p.active).length}
+              value={stats.inactive}
               icon={XCircle}
               iconBg="bg-muted/60"
               iconColor="text-muted-foreground"
-              description="Expired or deactivated codes"
+              description={pagination ? "Inactive codes on this page" : "Expired or deactivated codes"}
             />
           </>
         )}
@@ -1199,11 +1378,11 @@ export default function PromoCodesPage() {
       {!isLoading && promoCodes.length > 0 && (
         <FilterBar
           search={search}
-          onSearch={setSearch}
+          onSearch={handleSearchChange}
           status={statusFilter}
-          onStatus={setStatusFilter}
+          onStatus={handleStatusFilterChange}
           plan={planFilter}
-          onPlan={setPlanFilter}
+          onPlan={handlePlanFilterChange}
           onClear={clearFilters}
           hasFilters={hasFilters}
         />
@@ -1216,7 +1395,7 @@ export default function PromoCodesPage() {
           isFetching && !isLoading && "opacity-60"
         )}
       >
-        {isLoading ? (
+        {isLoading || isFetching ? (
           <ListSkeleton />
         ) : promoCodes.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/30 py-20 text-center">
@@ -1261,6 +1440,18 @@ export default function PromoCodesPage() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {pagination && (
+        <PromoCodesPaginationBar
+          pagination={pagination}
+          page={page}
+          limit={limit}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+          isFetching={isFetching}
+        />
+      )}
 
       {/* Create dialog */}
       <CreatePromoDialog open={createOpen} onClose={() => setCreateOpen(false)} />
