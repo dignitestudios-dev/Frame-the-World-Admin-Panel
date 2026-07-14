@@ -91,8 +91,8 @@ export interface CreatePromoCodePayload {
 export const promoKeys = {
   plans: ["promo", "plans"] as const,
   list: ["promo", "codes"] as const,
-  listPage: (page?: number, limit?: number) =>
-    page && limit ? (["promo", "codes", page, limit] as const) : (["promo", "codes"] as const),
+  listPage: (page?: number, limit?: number, status?: string, planKey?: string) =>
+    ["promo", "codes", { page, limit, status, planKey }] as const,
 };
 
 // ─── API functions ────────────────────────────────────────────────────────────
@@ -114,11 +114,15 @@ export interface FetchPromoCodesResult {
 
 const fetchPromoCodes = async (
   page?: number,
-  limit?: number
+  limit?: number,
+  status?: string,
+  planKey?: string
 ): Promise<FetchPromoCodesResult> => {
   const params: Record<string, any> = {};
   if (page) params.page = page;
   if (limit) params.limit = limit;
+  if (status && status !== "all") params.status = status;
+  if (planKey && planKey !== "all") params.planKey = planKey;
 
   const { data } = await API.get<PromoCodesResponse>(
     "/subscriptions/stripe/promo-code",
@@ -206,10 +210,15 @@ export const usePlans = () =>
     staleTime: 1000 * 60 * 10,
   });
 
-export const usePromoCodes = (page?: number, limit?: number) =>
+export const usePromoCodes = (
+  page?: number,
+  limit?: number,
+  status?: string,
+  planKey?: string
+) =>
   useQuery({
-    queryKey: promoKeys.listPage(page, limit),
-    queryFn: () => fetchPromoCodes(page, limit),
+    queryKey: promoKeys.listPage(page, limit, status, planKey),
+    queryFn: () => fetchPromoCodes(page, limit, status, planKey),
     staleTime: 1000 * 60 * 2,
   });
 

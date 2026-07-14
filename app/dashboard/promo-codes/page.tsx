@@ -1111,7 +1111,7 @@ const ListSkeleton = () => (
 
 // ─── Filter / Search bar ──────────────────────────────────────────────────────
 
-type StatusFilter = "all" | "active" | "expired" | "inactive";
+type StatusFilter = "all" | "active" | "inactive";
 type PlanFilter = "all" | "monthly" | "yearly";
 
 function FilterBar({
@@ -1137,7 +1137,6 @@ function FilterBar({
     { value: "all", label: "All Status" },
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
-    { value: "expired", label: "Expired" },
   ];
 
   const planOptions: { value: PlanFilter; label: string }[] = [
@@ -1237,7 +1236,12 @@ export default function PromoCodesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
 
-  const { data, isLoading, isFetching, refetch } = usePromoCodes(page, limit);
+  const { data, isLoading, isFetching, refetch } = usePromoCodes(
+    page,
+    limit,
+    statusFilter === "all" ? undefined : statusFilter,
+    planFilter === "all" ? undefined : planFilter
+  );
   const promoCodes = data?.promoCodes ?? [];
   const pagination = data?.pagination;
 
@@ -1267,7 +1271,6 @@ export default function PromoCodesPage() {
         const isActive = p.active && !isExpired;
         if (statusFilter === "active" && !isActive) return false;
         if (statusFilter === "inactive" && (isActive || isExpired)) return false;
-        if (statusFilter === "expired" && !isExpired) return false;
       }
       // Plan
       if (planFilter !== "all") {
