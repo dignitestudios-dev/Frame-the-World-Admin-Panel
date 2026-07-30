@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { API } from "./axios";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,7 +27,19 @@ export interface Frame {
   title: string;
   cover?: ContentMedia | null;
   totalPosts?: number;
+  posts?: string[];
   isPrivate?: boolean;
+  country?: string;
+  state?: string;
+  city?: string;
+  createdBy?: {
+    _id: string;
+    name: string;
+    email: string;
+    profilePicture?: {
+      key: string;
+    };
+  };
 }
 
 // FramePost = a post returned by GET /frames/:frameId/posts
@@ -44,15 +56,19 @@ export interface ContentPagination {
 interface PostsResponse {
   success: boolean;
   message: string;
-  data: Post[];
-  pagination: ContentPagination;
+  data: {
+    posts: Post[];
+    pagination: ContentPagination;
+  };
 }
 
 interface FramesResponse {
   success: boolean;
   message: string;
-  data: Frame[];
-  pagination: ContentPagination;
+  data: {
+    frames: Frame[];
+    pagination: ContentPagination;
+  };
 }
 
 interface FramePostsResponse {
@@ -66,6 +82,10 @@ export interface ContentParams {
   page?: number;
   limit?: number;
   targetUserId?: string;
+  isDeleted?: boolean;
+  isBlockedByAdmin?: boolean;
+  status?: string;
+  search?: string;
 }
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
@@ -85,7 +105,10 @@ const fetchPosts = async (params: ContentParams): Promise<PostsResponse> => {
   if (params.page) query.set("page", String(params.page));
   if (params.limit) query.set("limit", String(params.limit));
   if (params.targetUserId) query.set("targetUserId", params.targetUserId);
-  const { data } = await API.get<PostsResponse>(`/posts/all?${query.toString()}`);
+  if (params.isDeleted) query.set("isDeleted", "true");
+  if (params.isBlockedByAdmin) query.set("isBlockedByAdmin", "true");
+  if (params.status) query.set("status", params.status);
+  const { data } = await API.get<PostsResponse>(`/admin/posts?${query.toString()}`);
   return data;
 };
 
@@ -94,7 +117,11 @@ const fetchFrames = async (params: ContentParams): Promise<FramesResponse> => {
   if (params.page) query.set("page", String(params.page));
   if (params.limit) query.set("limit", String(params.limit));
   if (params.targetUserId) query.set("targetUserId", params.targetUserId);
-  const { data } = await API.get<FramesResponse>(`/frames/all?${query.toString()}`);
+  if (params.isDeleted) query.set("isDeleted", "true");
+  if (params.isBlockedByAdmin) query.set("isBlockedByAdmin", "true");
+  if (params.status) query.set("status", params.status);
+  if (params.search) query.set("search", params.search);
+  const { data } = await API.get<FramesResponse>(`/admin/frames?${query.toString()}`);
   return data;
 };
 
@@ -137,3 +164,69 @@ export const useFramePosts = (frameId: string, params: ContentParams = {}) =>
     placeholderData: (prev) => prev,
     staleTime: 1000 * 60 * 2,
   });
+
+export const useDeletePost = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const { data } = await API.patch(`/admin/posts/${postId}/delete`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+};
+
+export const useBlockPost = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const { data } = await API.patch(`/admin/posts/${postId}/block`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+};
+
+export const useRestorePost = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const { data } = await API.patch(`/admin/posts/${postId}/restore`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+};
+
+export const useDeleteFrame = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (frameId: string) => {
+      const { data } = await API.patch(`/admin/frames/${frameId}/delete`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+};
+
+export const useBlockFrame = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (frameId: string) => {
+      const { data } = await API.patch(`/admin/frames/${frameId}/block`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+};
+
+export const useRestoreFrame = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (frameId: string) => {
+      const { data } = await API.patch(`/admin/frames/${frameId}/restore`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+};

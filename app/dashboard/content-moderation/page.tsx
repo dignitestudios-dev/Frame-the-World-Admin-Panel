@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ShieldCheck, Images, BookImage, RefreshCw,
   ChevronLeft, ChevronRight, Lock, Globe, ImageIcon,
-  CheckCircle2, Clock, ZoomIn, Search, X, Filter,
+  CheckCircle2, Clock, ZoomIn, Search, X, Filter, MoreVertical, Trash2, Ban, Undo,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
@@ -18,10 +18,28 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatCard, StatCardSkeleton } from "@/components/stat-card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   usePosts,
   useFrames,
+  useDeletePost,
+  useBlockPost,
+  useRestorePost,
+  useDeleteFrame,
+  useBlockFrame,
+  useRestoreFrame,
   type Post,
   type Frame,
   type ContentPagination,
@@ -116,8 +134,8 @@ function Pager({ pagination, page, isFetching, onPage }: PagerProps) {
 
 // ─── Search + filter bar ──────────────────────────────────────────────────────
 
-type PostStatusFilter = "all" | "completed" | "pending" | "flagged";
-type FrameVisibilityFilter = "all" | "public";
+type PostFilterTab = "all" | "completed" | "pending" | "rejected" | "deleted" | "blocked";
+type FrameFilterTab = "all" | "deleted" | "blocked";
 
 function SearchBar({
   id,
@@ -216,7 +234,17 @@ function EmptySearch({ onClear }: { onClear: () => void }) {
 
 // ─── Post card ────────────────────────────────────────────────────────────────
 
-function PostCard({ post, onView }: { post: Post; onView: () => void }) {
+function PostCard({ 
+  post, 
+  onView,
+  postTab,
+  onAction
+}: { 
+  post: Post; 
+  onView: () => void;
+  postTab: PostFilterTab;
+  onAction: (action: "delete" | "block" | "restore", postId: string) => void;
+}) {
   if (!post.media?.location) return null;
   const status = getStatus(post.status);
   return (
@@ -258,11 +286,37 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
       </div>
 
       {/* Meta */}
-      <div className="p-3 space-y-1">
-        {post.caption && (
-          <p className="text-[11px] text-foreground/80 line-clamp-1">{post.caption}</p>
-        )}
-        <p className="text-[11px] text-muted-foreground">{fmtDate(post.createdAt)}</p>
+      <div className="flex items-start justify-between p-3 gap-2">
+        <div className="space-y-1">
+          {post.caption && (
+            <p className="text-[11px] text-foreground/80 line-clamp-1">{post.caption}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground">{fmtDate(post.createdAt)}</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 -mr-1 mt-0">
+              <MoreVertical className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {(postTab === "all" || postTab === "completed" || postTab === "pending") && (
+              <>
+                <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onClick={() => onAction("delete", post._id)}>
+                  <Trash2 className="size-4 mr-2" /> Delete
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-amber-600 focus:bg-amber-50 focus:text-amber-700" onClick={() => onAction("block", post._id)}>
+                  <Ban className="size-4 mr-2" /> Block
+                </DropdownMenuItem>
+              </>
+            )}
+            {(postTab === "deleted" || postTab === "blocked") && (
+              <DropdownMenuItem className="text-emerald-600 focus:bg-emerald-50 focus:text-emerald-700" onClick={() => onAction("restore", post._id)}>
+                <Undo className="size-4 mr-2" /> Restore
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -270,9 +324,20 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
 
 // ─── Frame card ───────────────────────────────────────────────────────────────
 
-function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
+function FrameCard({ 
+  frame, 
+  onClick,
+  frameTab,
+  onAction
+}: { 
+  frame: Frame; 
+  onClick?: () => void;
+  frameTab: FrameFilterTab;
+  onAction: (action: "delete" | "block" | "restore", frameId: string) => void;
+}) {
   if (!frame.cover?.location) return null;
-  const isClickable = (frame.totalPosts ?? 0) >= 1;
+  const postsCount = frame.posts?.length ?? frame.totalPosts ?? 0;
+  const isClickable = postsCount >= 1;
   return (
     <div
       className={cn(
@@ -316,6 +381,33 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
             </span>
           )}
         </div>
+        {/* Action Menu */}
+        <div className="absolute left-2 top-2" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" className="size-7 rounded-full bg-black/50 text-white hover:bg-black/70 backdrop-blur-sm border-0">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {(frameTab === "all") && (
+                <>
+                  <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onClick={() => onAction("delete", frame._id)}>
+                    <Trash2 className="size-4 mr-2" /> Delete
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-amber-600 focus:bg-amber-50 focus:text-amber-700" onClick={() => onAction("block", frame._id)}>
+                    <Ban className="size-4 mr-2" /> Block
+                  </DropdownMenuItem>
+                </>
+              )}
+              {(frameTab === "deleted" || frameTab === "blocked") && (
+                <DropdownMenuItem className="text-green-600 focus:bg-green-50 focus:text-green-700" onClick={() => onAction("restore", frame._id)}>
+                  <RefreshCw className="size-4 mr-2" /> Restore
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Meta */}
@@ -332,7 +424,7 @@ function FrameCard({ frame, onClick }: { frame: Frame; onClick?: () => void }) {
           )}
         >
           <ImageIcon className="size-2.5" />
-          {frame.totalPosts ?? 0} {frame.totalPosts === 1 ? "post" : "posts"}
+          {postsCount} {postsCount === 1 ? "post" : "posts"}
         </span>
       </div>
     </div>
@@ -346,58 +438,106 @@ export default function ContentModerationPage() {
   const [postsPage, setPostsPage] = useState(1);
   const [framesPage, setFramesPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const [frameToDelete, setFrameToDelete] = useState<string | null>(null);
+  const [postToBlock, setPostToBlock] = useState<string | null>(null);
+  const [frameToBlock, setFrameToBlock] = useState<string | null>(null);
 
   // Posts filters
-  const [postStatus, setPostStatus] = useState<PostStatusFilter>("all");
+  const [postFilter, setPostFilter] = useState<PostFilterTab>("all");
 
   // Frames filters
+  const [frameFilter, setFrameFilter] = useState<FrameFilterTab>("all");
   const [frameSearch, setFrameSearch] = useState("");
-  const [frameVisibility, setFrameVisibility] = useState<FrameVisibilityFilter>("all");
+  const [debouncedFrameSearch, setDebouncedFrameSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedFrameSearch(frameSearch), 500);
+    return () => clearTimeout(timer);
+  }, [frameSearch]);
+
+  const postsParams: any = { page: postsPage, limit: PAGE_LIMIT };
+  if (postFilter === "deleted") postsParams.isDeleted = true;
+  else if (postFilter === "blocked") postsParams.isBlockedByAdmin = true;
+  else if (postFilter !== "all") postsParams.status = postFilter;
 
   const {
     data: postsData,
     isLoading: postsLoading,
     isFetching: postsFetching,
     refetch: refetchPosts,
-  } = usePosts({ page: postsPage, limit: PAGE_LIMIT });
+  } = usePosts(postsParams);
+
+  const { mutateAsync: deletePost, isPending: isDeleting } = useDeletePost();
+  const { mutateAsync: blockPost, isPending: isBlockingPost } = useBlockPost();
+  const { mutateAsync: restorePost } = useRestorePost();
+
+  const handlePostAction = async (action: "delete" | "block" | "restore", postId: string) => {
+    if (action === "delete") {
+      setPostToDelete(postId);
+      return;
+    }
+    if (action === "block") {
+      setPostToBlock(postId);
+      return;
+    }
+
+    try {
+      if (action === "restore") await restorePost(postId);
+      toast.success(`Post ${action}d successfully`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || `Failed to ${action} post`);
+    }
+  };
+
+  const framesParams: any = { page: framesPage, limit: PAGE_LIMIT };
+  if (frameFilter === "deleted") framesParams.isDeleted = true;
+  else if (frameFilter === "blocked") framesParams.isBlockedByAdmin = true;
+  if (debouncedFrameSearch) framesParams.search = debouncedFrameSearch;
 
   const {
     data: framesData,
     isLoading: framesLoading,
     isFetching: framesFetching,
     refetch: refetchFrames,
-  } = useFrames({ page: framesPage, limit: PAGE_LIMIT });
+  } = useFrames(framesParams);
 
-  const posts = postsData?.data ?? [];
-  const frames = framesData?.data ?? [];
+  const posts = postsData?.data?.posts ?? [];
+  const frames = framesData?.data?.frames ?? [];
   const isLoading = postsLoading || framesLoading;
   const isFetching = postsFetching || framesFetching;
 
-  // ── Client-side filtering ──────────────────────────────────────────────────
+  const { mutateAsync: deleteFrame, isPending: isDeletingFrame } = useDeleteFrame();
+  const { mutateAsync: blockFrame, isPending: isBlockingFrame } = useBlockFrame();
+  const { mutateAsync: restoreFrame } = useRestoreFrame();
 
-  const filteredPosts = useMemo(() => {
-    return posts.filter((p) => {
-      if (postStatus !== "all" && p.status.toLowerCase() !== postStatus) return false;
-      return true;
-    });
-  }, [posts, postStatus]);
+  const handleFrameAction = async (action: "delete" | "block" | "restore", frameId: string) => {
+    if (action === "delete") {
+      setFrameToDelete(frameId);
+      return;
+    }
+    if (action === "block") {
+      setFrameToBlock(frameId);
+      return;
+    }
 
-  const filteredFrames = useMemo(() => {
-    return frames.filter((f) => {
-      if (frameSearch) {
-        const q = frameSearch.toLowerCase();
-        if (!f.title?.toLowerCase().includes(q)) return false;
-      }
-      if (frameVisibility === "public" && f.isPrivate) return false;
-      return true;
-    });
-  }, [frames, frameSearch, frameVisibility]);
+    try {
+      if (action === "restore") await restoreFrame(frameId);
+      toast.success(`Frame ${action}d successfully`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || `Failed to ${action} frame`);
+    }
+  };
 
-  const hasPostFilters = postStatus !== "all";
-  const hasFrameFilters = frameSearch !== "" || frameVisibility !== "all";
+  const filteredPosts = posts;
 
-  const clearPostFilters = () => { setPostStatus("all"); };
-  const clearFrameFilters = () => { setFrameSearch(""); setFrameVisibility("all"); };
+  const filteredFrames = frames;
+
+  const hasPostFilters = postFilter !== "all";
+  const hasFrameFilters = frameFilter !== "all" || frameSearch !== "";
+
+  const clearPostFilters = () => { setPostFilter("all"); };
+  const clearFrameFilters = () => { setFrameFilter("all"); setFrameSearch(""); };
 
   // Rebuild slide index from filtered posts for lightbox
   const slides = filteredPosts
@@ -454,14 +594,14 @@ export default function ContentModerationPage() {
           <>
             <StatCard
               label="Total Posts"
-              value={postsData?.pagination.totalItems ?? 0}
+              value={postsData?.data?.pagination?.totalItems ?? 0}
               description="All user-uploaded posts"
               icon={Images}
               gradient
             />
             <StatCard
               label="Total Frames"
-              value={framesData?.pagination.totalItems ?? 0}
+              value={framesData?.data?.pagination?.totalItems ?? 0}
               description="All created frames"
               icon={BookImage}
               gradient
@@ -469,8 +609,8 @@ export default function ContentModerationPage() {
             <StatCard
               label="Total Content"
               value={
-                (postsData?.pagination.totalItems ?? 0) +
-                (framesData?.pagination.totalItems ?? 0)
+                (postsData?.data?.pagination?.totalItems ?? 0) +
+                (framesData?.data?.pagination?.totalItems ?? 0)
               }
               description="Posts + frames combined"
               icon={ShieldCheck}
@@ -485,17 +625,17 @@ export default function ContentModerationPage() {
         <TabsList className="grid w-full max-w-xs grid-cols-2">
           <TabsTrigger value="posts" className="gap-1.5">
             <Images className="size-3.5" /> Posts
-            {!isLoading && postsData && (
+            {!isLoading && postsData?.data && (
               <Badge className="ml-1 h-4 px-1.5 text-[10px] bg-primary text-primary-foreground">
-                {postsData.pagination.totalItems}
+                {postsData.data.pagination.totalItems}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="frames" className="gap-1.5">
             <BookImage className="size-3.5" /> Frames
-            {!isLoading && framesData && (
+            {!isLoading && framesData?.data && (
               <Badge className="ml-1 h-4 px-1.5 text-[10px] bg-primary text-primary-foreground">
-                {framesData.pagination.totalItems}
+                {framesData.data.pagination.totalItems}
               </Badge>
             )}
           </TabsTrigger>
@@ -504,32 +644,33 @@ export default function ContentModerationPage() {
         {/* ── Posts tab ── */}
         <TabsContent value="posts" className="mt-6 space-y-4">
           {/* Search + filter bar */}
-          {!postsLoading && posts.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Filter className="size-3.5 text-muted-foreground" />
-              </div>
-              <FilterChips<PostStatusFilter>
-                value={postStatus}
-                onChange={setPostStatus}
-                options={[
-                  { value: "all", label: "All" },
-                  { value: "completed", label: "Completed" },
-                  { value: "pending", label: "Pending" },
-                ]}
-              />
-              {hasPostFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={clearPostFilters}
-                >
-                  <X className="size-3.5" /> Clear
-                </Button>
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Filter className="size-3.5 text-muted-foreground" />
             </div>
-          )}
+            <FilterChips<PostFilterTab>
+              value={postFilter}
+              onChange={(v) => { setPostFilter(v); setPostsPage(1); }}
+              options={[
+                { value: "all", label: "All Posts" },
+                { value: "completed", label: "Completed" },
+                { value: "pending", label: "Pending" },
+                { value: "rejected", label: "Rejected" },
+                { value: "deleted", label: "Deleted" },
+                { value: "blocked", label: "Blocked" },
+              ]}
+            />
+            {hasPostFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={clearPostFilters}
+              >
+                <X className="size-3.5" /> Clear
+              </Button>
+            )}
+          </div>
 
           <div className={cn("transition-opacity", postsFetching && "opacity-60")}>
             {postsLoading ? (
@@ -551,6 +692,8 @@ export default function ContentModerationPage() {
                       <PostCard
                         key={post._id}
                         post={post}
+                        postTab={postFilter}
+                        onAction={handlePostAction}
                         onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
                       />
                     );
@@ -563,15 +706,9 @@ export default function ContentModerationPage() {
             )}
           </div>
 
-          {/* Result count when filtering */}
-          {hasPostFilters && filteredPosts.length > 0 && (
-            <p className="text-center text-xs text-muted-foreground">
-              Showing {filteredPosts.length} of {posts.length} posts on this page
-            </p>
-          )}
 
           <Pager
-            pagination={postsData?.pagination}
+            pagination={postsData?.data?.pagination}
             page={postsPage}
             isFetching={postsFetching}
             onPage={(p) => { setPostsPage(p); clearPostFilters(); }}
@@ -581,34 +718,36 @@ export default function ContentModerationPage() {
         {/* ── Frames tab ── */}
         <TabsContent value="frames" className="mt-6 space-y-4">
           {/* Search + filter bar */}
-          {!framesLoading && frames.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchBar
-                id="frame-search"
-                value={frameSearch}
-                onChange={setFrameSearch}
-                placeholder="Search by frame title…"
-              />
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Filter className="size-3.5 text-muted-foreground" />
-              </div>
-              <FilterChips<FrameVisibilityFilter>
-                value={frameVisibility}
-                onChange={setFrameVisibility}
-                options={[]}
-              />
-              {hasFrameFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={clearFrameFilters}
-                >
-                  <X className="size-3.5" /> Clear
-                </Button>
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchBar
+              id="frame-search"
+              value={frameSearch}
+              onChange={(v) => { setFrameSearch(v); setFramesPage(1); }}
+              placeholder="Search by frame title…"
+            />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Filter className="size-3.5 text-muted-foreground" />
             </div>
-          )}
+            <FilterChips<FrameFilterTab>
+              value={frameFilter}
+              onChange={(v) => { setFrameFilter(v); setFramesPage(1); }}
+              options={[
+                { value: "all", label: "All Frames" },
+                { value: "deleted", label: "Deleted" },
+                { value: "blocked", label: "Blocked" },
+              ]}
+            />
+            {hasFrameFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={clearFrameFilters}
+              >
+                <X className="size-3.5" /> Clear
+              </Button>
+            )}
+          </div>
 
           <div className={cn("transition-opacity", framesFetching && "opacity-60")}>
             {framesLoading ? (
@@ -627,6 +766,8 @@ export default function ContentModerationPage() {
                   <FrameCard
                     key={frame._id}
                     frame={frame}
+                    frameTab={frameFilter}
+                    onAction={handleFrameAction}
                     onClick={() =>
                       router.push(`/dashboard/frames/${frame._id}/posts`)
                     }
@@ -636,21 +777,150 @@ export default function ContentModerationPage() {
             )}
           </div>
 
-          {/* Result count when filtering */}
-          {hasFrameFilters && filteredFrames.length > 0 && (
-            <p className="text-center text-xs text-muted-foreground">
-              Showing {filteredFrames.length} of {frames.length} frames on this page
-            </p>
-          )}
-
           <Pager
-            pagination={framesData?.pagination}
+            pagination={framesData?.data?.pagination}
             page={framesPage}
             isFetching={framesFetching}
-            onPage={(p) => { setFramesPage(p); clearFrameFilters(); }}
+            onPage={(p) => { setFramesPage(p); }}
           />
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!postToDelete} onOpenChange={(open) => {
+        if (!isDeleting && !open) setPostToDelete(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+              onClick={async (e) => {
+                e.preventDefault(); // Prevent the dialog from closing immediately
+                if (postToDelete) {
+                  try {
+                    await deletePost(postToDelete);
+                    toast.success("Post deleted successfully");
+                    setPostToDelete(null); // Close dialog on success
+                  } catch (error: any) {
+                    toast.error(error?.response?.data?.message || "Failed to delete post");
+                  }
+                }
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!frameToDelete} onOpenChange={(open) => {
+        if (!isDeletingFrame && !open) setFrameToDelete(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the frame.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingFrame}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeletingFrame}
+              onClick={async (e) => {
+                e.preventDefault(); // Prevent the dialog from closing immediately
+                if (frameToDelete) {
+                  try {
+                    await deleteFrame(frameToDelete);
+                    toast.success("Frame deleted successfully");
+                    setFrameToDelete(null); // Close dialog on success
+                  } catch (error: any) {
+                    toast.error(error?.response?.data?.message || "Failed to delete frame");
+                  }
+                }
+              }}
+            >
+              {isDeletingFrame ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!postToBlock} onOpenChange={(open) => {
+        if (!isBlockingPost && !open) setPostToBlock(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to block this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This post will be hidden from public view until restored.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBlockingPost}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={isBlockingPost}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (postToBlock) {
+                  try {
+                    await blockPost(postToBlock);
+                    toast.success("Post blocked successfully");
+                    setPostToBlock(null);
+                  } catch (error: any) {
+                    toast.error(error?.response?.data?.message || "Failed to block post");
+                  }
+                }
+              }}
+            >
+              {isBlockingPost ? "Blocking..." : "Block"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!frameToBlock} onOpenChange={(open) => {
+        if (!isBlockingFrame && !open) setFrameToBlock(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to block this frame?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This frame will be hidden from public view until restored.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBlockingFrame}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={isBlockingFrame}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (frameToBlock) {
+                  try {
+                    await blockFrame(frameToBlock);
+                    toast.success("Frame blocked successfully");
+                    setFrameToBlock(null);
+                  } catch (error: any) {
+                    toast.error(error?.response?.data?.message || "Failed to block frame");
+                  }
+                }
+              }}
+            >
+              {isBlockingFrame ? "Blocking..." : "Block"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
