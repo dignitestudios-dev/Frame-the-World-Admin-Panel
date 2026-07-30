@@ -208,8 +208,8 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
     refetch: refetchFrames,
   } = useFrames({ page: framesPage, limit: PAGE_LIMIT, targetUserId: id });
 
-  const posts = postsData?.data ?? [];
-  const frames = framesData?.data ?? [];
+  const posts = postsData?.data?.posts ?? [];
+  const frames = framesData?.data?.frames ?? [];
   const isFetching = postsFetching || framesFetching;
 
   const slides = posts
@@ -272,17 +272,17 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
         <TabsList className="grid w-full max-w-xs grid-cols-2">
           <TabsTrigger value="posts" className="gap-1.5">
             <Images className="size-3.5" /> Posts
-            {!postsLoading && postsData && (
+            {!postsLoading && postsData?.data && (
               <Badge className="ml-1 h-4 px-1.5 text-[10px] bg-primary text-primary-foreground">
-                {postsData.pagination.totalItems}
+                {postsData.data.pagination.totalItems}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="frames" className="gap-1.5">
             <BookImage className="size-3.5" /> Frames
-            {!framesLoading && framesData && (
+            {!framesLoading && framesData?.data && (
               <Badge className="ml-1 h-4 px-1.5 text-[10px] bg-primary text-primary-foreground">
-                {framesData.pagination.totalItems}
+                {framesData.data.pagination.totalItems}
               </Badge>
             )}
           </TabsTrigger>
@@ -312,7 +312,7 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
                 </div>
             }
           </div>
-          <Pager pagination={postsData?.pagination} page={postsPage} isFetching={postsFetching} onPage={setPostsPage} />
+          <Pager pagination={postsData?.data?.pagination} page={postsPage} isFetching={postsFetching} onPage={setPostsPage} />
         </TabsContent>
 
         {/* Frames */}
@@ -331,7 +331,7 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
                 </div>
             }
           </div>
-          <Pager pagination={framesData?.pagination} page={framesPage} isFetching={framesFetching} onPage={setFramesPage} />
+          <Pager pagination={framesData?.data?.pagination} page={framesPage} isFetching={framesFetching} onPage={setFramesPage} />
         </TabsContent>
       </Tabs>
     </div>
