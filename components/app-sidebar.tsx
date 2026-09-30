@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   Trophy,
   Award,
+  FileText,
   BellRing,
 } from "lucide-react";
 import Image from "next/image";
@@ -76,6 +77,11 @@ const data = {
           title: "Content Moderation",
           url: "/dashboard/content-moderation",
           icon: ShieldAlert,
+        },
+        {
+          title: "Reports",
+          url: "/dashboard/reports",
+          icon: FileText,
         },
       ],
     },
