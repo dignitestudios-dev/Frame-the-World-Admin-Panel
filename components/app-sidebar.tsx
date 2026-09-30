@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   Trophy,
   Award,
+  BellRing,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -55,6 +56,16 @@ const data = {
           title: "Promo Codes",
           url: "/dashboard/promo-codes",
           icon: Ticket,
+        },
+      ],
+    },
+    {
+      label: "Engagement",
+      items: [
+        {
+          title: "Push Notifications",
+          url: "/dashboard/notifications",
+          icon: BellRing,
         },
       ],
     },
