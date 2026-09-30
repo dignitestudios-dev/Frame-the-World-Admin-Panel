@@ -9,7 +9,7 @@ import {
   Trophy,
   Award,
   FileText,
-  // BellRing,
+  BellRing,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -60,17 +60,16 @@ const data = {
         },
       ],
     },
-    // Push Notifications is hidden for now; the page still works at /dashboard/notifications.
-    // {
-    //   label: "Engagement",
-    //   items: [
-    //     {
-    //       title: "Push Notifications",
-    //       url: "/dashboard/notifications",
-    //       icon: BellRing,
-    //     },
-    //   ],
-    // },
+    {
+      label: "Engagement",
+      items: [
+        {
+          title: "Push Notifications",
+          url: "/dashboard/notifications",
+          icon: BellRing,
+        },
+      ],
+    },
     {
       label: "Content",
       items: [
