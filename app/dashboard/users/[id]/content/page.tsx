@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn, formatStatusLabel } from "@/lib/utils";
 import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import { usePosts, useFrames, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
 import { useUserById } from "@/lib/api/users.api";
@@ -35,7 +35,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   flagged:   { label: "Flagged",   className: "bg-white text-red-700 border-red-300" },
 };
 const getStatus = (s: string) =>
-  STATUS_CONFIG[s.toLowerCase()] ?? { label: s, className: "bg-muted text-muted-foreground border-border" };
+  STATUS_CONFIG[s.toLowerCase()] ?? { label: formatStatusLabel(s), className: "bg-muted text-muted-foreground border-border" };
 
 // ─── Skeleton grid ────────────────────────────────────────────────────────────
 

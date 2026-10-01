@@ -18,7 +18,7 @@ import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatStatusLabel } from "@/lib/utils";
 import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   useFramePosts,
@@ -132,7 +132,7 @@ function FramePostCard({
             {isCompleted
               ? <CheckCircle2 className="size-2.5" />
               : <Clock className="size-2.5" />}
-            {isCompleted ? "Completed" : "Pending"}
+            {formatStatusLabel(status)}
           </span>
         </div>
       </div>

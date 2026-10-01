@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatStatusLabel } from "@/lib/utils";
 import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   usePosts,
@@ -65,7 +65,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 };
 const getStatus = (s: string) =>
   STATUS_CONFIG[s.toLowerCase()] ?? {
-    label: s,
+    label: formatStatusLabel(s),
     className: "bg-white text-muted-foreground border-border",
   };
 
