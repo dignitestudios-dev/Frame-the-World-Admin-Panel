@@ -7,15 +7,25 @@ export interface ContentMedia {
   _id?: string;
   fileName?: string;
   filename?: string; // some endpoints return lowercase
+  originalFilename?: string | null;
   key?: string;
   location: string;
+  mimetype?: string; // e.g. "image/jpeg", "video/mp4"
+  type?: "image" | "video";
+  status?: string; // "ready" once the upload has been processed
+  size?: number;
+  duration?: number; // seconds, videos only
+  thumbnail?: string | null; // unpopulated media id for videos — not a URL
   createdAt?: string;
   updatedAt?: string;
 }
 
+export type PostMediaType = "image" | "video";
+
 export interface Post {
   _id: string;
   media?: ContentMedia | null;
+  mediaType?: PostMediaType;
   status: string;
   caption?: string | null;
   createdAt: string;

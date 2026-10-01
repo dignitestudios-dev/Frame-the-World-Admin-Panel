@@ -5,17 +5,19 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, BookImage, ChevronLeft, ChevronRight,
-  CheckCircle2, Clock, Globe, ImageIcon, Images, Lock, RefreshCw, ZoomIn,
+  CheckCircle2, Clock, Globe, ImageIcon, Images, Lock, RefreshCw,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import { usePosts, useFrames, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
 import { useUserById } from "@/lib/api/users.api";
 import { UserAvatar } from "@/app/dashboard/users/components/user-avatar";
@@ -92,19 +94,10 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative aspect-[4/3] overflow-hidden bg-muted cursor-pointer" onClick={onView}>
-        <Image
-          src={post.media.location}
-          alt="Post media"
-          fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        <PostMediaCover
+          post={post}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-        {/* Hover overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <div className="flex size-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-            <ZoomIn className="size-5 text-white" />
-          </div>
-        </div>
         <div className="absolute left-2 top-2">
           <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm", status.className)}>
             {post.status === "completed" ? <CheckCircle2 className="size-2.5" /> : <Clock className="size-2.5" />}
@@ -214,7 +207,7 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
 
   const slides = posts
     .filter((p) => p.media?.location)
-    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
+    .map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -224,7 +217,8 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen]}
+        plugins={[Video, Zoom, Fullscreen]}
+        video={lightboxVideoOptions}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />

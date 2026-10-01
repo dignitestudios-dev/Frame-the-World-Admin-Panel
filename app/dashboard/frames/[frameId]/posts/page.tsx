@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, use } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -11,15 +10,16 @@ import {
   ChevronRight,
   Clock,
   RefreshCw,
-  ZoomIn,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   useFramePosts,
   type FramePost,
@@ -116,20 +116,10 @@ function FramePostCard({
         className="relative aspect-[4/3] cursor-pointer overflow-hidden bg-muted"
         onClick={onView}
       >
-        <Image
-          src={imgSrc}
-          alt="Post image"
-          fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        <PostMediaCover
+          post={post}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-
-        {/* Hover zoom overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <div className="flex size-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-2 ring-white/40">
-            <ZoomIn className="size-5 text-white" />
-          </div>
-        </div>
 
         {/* Status badge */}
         <div className="absolute left-2 top-2">
@@ -181,7 +171,7 @@ export default function FramePostsPage({
   const posts = data?.data ?? [];
   const slides = posts
     .filter((p) => p.media?.location)
-    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
+    .map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -191,7 +181,8 @@ export default function FramePostsPage({
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen]}
+        plugins={[Video, Zoom, Fullscreen]}
+        video={lightboxVideoOptions}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />
