@@ -11,20 +11,46 @@ export interface ContentMedia {
   key?: string;
   location: string;
   mimetype?: string; // e.g. "image/jpeg", "video/mp4"
-  type?: "image" | "video";
+  type?: "image" | "video" | string;
   status?: string; // "ready" once the upload has been processed
   size?: number;
   duration?: number; // seconds, videos only
-  thumbnail?: string | null; // unpopulated media id for videos — not a URL
+  thumbnail?: string | {
+    _id?: string;
+    filename?: string;
+    originalFilename?: string | null;
+    key?: string;
+    location?: string;
+    mimetype?: string;
+    size?: number;
+    status?: string;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
-export type PostMediaType = "image" | "video";
+export type PostMediaType = "image" | "video" | string;
+
+export interface PostCategory {
+  _id: string;
+  name: string;
+  slug?: string;
+}
+
+export interface PostUser {
+  _id: string;
+  name?: string;
+  email?: string;
+  profilePicture?: {
+    _id?: string;
+    key?: string;
+    location?: string;
+  };
+}
 
 export interface Post {
   _id: string;
-  media?: ContentMedia | null;
+  media?: ContentMedia | ContentMedia[] | null;
   mediaType?: PostMediaType;
   status: string;
   caption?: string | null;
@@ -62,7 +88,8 @@ export function getPostMediaUrl(post: Post): { previewUrl: string; fullUrl: stri
     media.location.toLowerCase().endsWith(".mov") ||
     media.location.toLowerCase().endsWith(".webm");
 
-  const previewUrl = isVideo ? (media.thumbnail?.location || media.location) : media.location;
+  const thumbnailLocation = typeof media.thumbnail === "object" ? media.thumbnail?.location : undefined;
+  const previewUrl = isVideo ? (thumbnailLocation || media.location) : media.location;
   const fullUrl = media.location;
 
   return { previewUrl, fullUrl, isVideo };

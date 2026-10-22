@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn, formatStatusLabel } from "@/lib/utils";
 import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
-import { usePosts, useFrames, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
+import { usePosts, useFrames, getPostMedia, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
 import { useUserById } from "@/lib/api/users.api";
 import { UserAvatar } from "@/app/dashboard/users/components/user-avatar";
 
@@ -89,8 +89,8 @@ function Pager({ pagination, page, isFetching, onPage }: PagerProps) {
 // ─── Post card ────────────────────────────────────────────────────────────────
 
 function PostCard({ post, onView }: { post: Post; onView: () => void }) {
-  const mediaInfo = getPostMediaUrl(post);
-  if (!mediaInfo) return null;
+  const media = getPostMedia(post);
+  if (!media?.location) return null;
   const status = getStatus(post.status);
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
@@ -99,7 +99,7 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
           post={post}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm", status.className)}>
             {post.status === "completed" ? <CheckCircle2 className="size-2.5" /> : <Clock className="size-2.5" />}
             {status.label}
@@ -115,13 +115,6 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
             </Badge>
           )}
         </div>
-        {mediaInfo.isVideo && (
-          <div className="absolute right-2 top-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-              <Film className="size-2.5" /> Video
-            </span>
-          </div>
-        )}
       </div>
       <div className="p-3">
         {post.caption && (
@@ -228,9 +221,8 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
   const frames = framesData?.data?.frames ?? [];
   const isFetching = postsFetching || framesFetching;
 
-  const slides = posts
-    .filter((p) => p.media?.location)
-    .map(postToSlide);
+  const validPosts = posts.filter((p) => Boolean(getPostMedia(p)?.location));
+  const slides = validPosts.map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -312,7 +304,7 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
               ? <Empty icon={Images} label="posts" />
               : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                   {posts.map((post) => {
-                    const slideIdx = validPostsWithMedia.findIndex((v) => v.post._id === post._id);
+                    const slideIdx = validPosts.findIndex((v) => v._id === post._id);
                     return (
                       <PostCard
                         key={post._id}

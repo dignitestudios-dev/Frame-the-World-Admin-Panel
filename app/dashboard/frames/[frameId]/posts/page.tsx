@@ -24,6 +24,7 @@ import { cn, formatStatusLabel } from "@/lib/utils";
 import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   useFramePosts,
+  getPostMedia,
   getPostMediaUrl,
   type FramePost,
   type ContentPagination,
@@ -107,8 +108,8 @@ function FramePostCard({
   post: FramePost;
   onView: () => void;
 }) {
-  const mediaInfo = getPostMediaUrl(post);
-  if (!mediaInfo) return null;
+  const media = getPostMedia(post);
+  if (!media?.location) return null;
 
   const status = post.status ?? "unknown";
   const isCompleted = status === "completed";
@@ -148,13 +149,6 @@ function FramePostCard({
             </span>
           )}
         </div>
-        {mediaInfo.isVideo && (
-          <div className="absolute right-2 top-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-              <Film className="size-2.5" /> Video
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Meta */}
@@ -189,9 +183,8 @@ export default function FramePostsPage({
   });
 
   const posts = data?.data ?? [];
-  const slides = posts
-    .filter((p) => p.media?.location)
-    .map(postToSlide);
+  const validPosts = posts.filter((p) => Boolean(getPostMedia(p)?.location));
+  const slides = validPosts.map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -261,7 +254,7 @@ export default function FramePostsPage({
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {posts.map((post) => {
-              const slideIdx = validPostsWithMedia.findIndex((v) => v.post._id === post._id);
+              const slideIdx = validPosts.findIndex((v) => v._id === post._id);
               return (
                 <FramePostCard
                   key={post._id}

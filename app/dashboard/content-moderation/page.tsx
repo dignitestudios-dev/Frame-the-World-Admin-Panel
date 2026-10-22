@@ -42,6 +42,7 @@ import {
   useDeleteFrame,
   useBlockFrame,
   useRestoreFrame,
+  getPostMedia,
   getPostMediaUrl,
   type Post,
   type Frame,
@@ -248,8 +249,8 @@ function PostCard({
   postTab: PostFilterTab;
   onAction: (action: "delete" | "block" | "restore", postId: string) => void;
 }) {
-  const mediaInfo = getPostMediaUrl(post);
-  if (!mediaInfo) return null;
+  const media = getPostMedia(post);
+  if (!media?.location) return null;
   const status = getStatus(post.status);
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
@@ -288,13 +289,6 @@ function PostCard({
             </Badge>
           )}
         </div>
-        {mediaInfo.isVideo && (
-          <div className="absolute right-2 top-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-              <Film className="size-2.5" /> Video
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Meta */}
@@ -551,14 +545,8 @@ export default function ContentModerationPage() {
   const clearPostFilters = () => { setPostFilter("all"); };
   const clearFrameFilters = () => { setFrameFilter("all"); setFrameSearch(""); };
 
-  const validFilteredPosts = filteredPosts
-    .map((post) => ({ post, mediaInfo: getPostMediaUrl(post) }))
-    .filter((item): item is { post: Post; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
-
-  // Rebuild slide index from filtered posts for lightbox
-  const slides = filteredPosts
-    .filter((p) => p.media?.location)
-    .map(postToSlide);
+  const validFilteredPosts = filteredPosts.filter((p) => Boolean(getPostMedia(p)?.location));
+  const slides = validFilteredPosts.map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -703,7 +691,7 @@ export default function ContentModerationPage() {
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {filteredPosts.map((post) => {
-                  const slideIdx = validFilteredPosts.findIndex((v) => v.post._id === post._id);
+                  const slideIdx = validFilteredPosts.findIndex((v) => v._id === post._id);
                   return (
                     <PostCard
                       key={post._id}
