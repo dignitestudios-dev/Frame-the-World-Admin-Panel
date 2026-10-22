@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   ShieldCheck, Images, BookImage, RefreshCw,
   ChevronLeft, ChevronRight, Lock, Globe, ImageIcon,
-  CheckCircle2, Clock, ZoomIn, Search, X, Filter, MoreVertical, Trash2, Ban, Undo,
+  CheckCircle2, Clock, Film, Play, ZoomIn, Search, X, Filter, MoreVertical, Trash2, Ban, Undo,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
   useDeleteFrame,
   useBlockFrame,
   useRestoreFrame,
+  getPostMediaUrl,
   type Post,
   type Frame,
   type ContentPagination,
@@ -245,7 +247,8 @@ function PostCard({
   postTab: PostFilterTab;
   onAction: (action: "delete" | "block" | "restore", postId: string) => void;
 }) {
-  if (!post.media?.location) return null;
+  const mediaInfo = getPostMediaUrl(post);
+  if (!mediaInfo) return null;
   const status = getStatus(post.status);
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
@@ -255,8 +258,8 @@ function PostCard({
         onClick={onView}
       >
         <Image
-          src={post.media.location}
-          alt="Post media"
+          src={mediaInfo.previewUrl}
+          alt={post.caption || "Post media"}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -264,11 +267,11 @@ function PostCard({
         {/* Hover overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <div className="flex size-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-2 ring-white/40">
-            <ZoomIn className="size-5 text-white" />
+            {mediaInfo.isVideo ? <Play className="size-5 text-white fill-white ml-0.5" /> : <ZoomIn className="size-5 text-white" />}
           </div>
         </div>
         {/* Status overlay badge */}
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm",
@@ -282,7 +285,24 @@ function PostCard({
             )}
             {status.label}
           </span>
+          {post.isDeleted && (
+            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] backdrop-blur-sm">
+              Deleted
+            </Badge>
+          )}
+          {post.isBlockedByAdmin && (
+            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] backdrop-blur-sm">
+              Blocked
+            </Badge>
+          )}
         </div>
+        {mediaInfo.isVideo && (
+          <div className="absolute right-2 top-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+              <Film className="size-2.5" /> Video
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Meta */}
@@ -539,10 +559,29 @@ export default function ContentModerationPage() {
   const clearPostFilters = () => { setPostFilter("all"); };
   const clearFrameFilters = () => { setFrameFilter("all"); setFrameSearch(""); };
 
+  const validFilteredPosts = filteredPosts
+    .map((post) => ({ post, mediaInfo: getPostMediaUrl(post) }))
+    .filter((item): item is { post: Post; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
+
   // Rebuild slide index from filtered posts for lightbox
-  const slides = filteredPosts
-    .filter((p) => p.media?.location)
-    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
+  const slides = validFilteredPosts.map(({ post, mediaInfo }) => {
+    if (mediaInfo.isVideo) {
+      return {
+        type: "video" as const,
+        poster: mediaInfo.previewUrl,
+        sources: [
+          {
+            src: mediaInfo.fullUrl,
+            type: "video/mp4",
+          },
+        ],
+      };
+    }
+    return {
+      src: mediaInfo.fullUrl,
+      alt: post.caption || "Post image",
+    };
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -552,7 +591,7 @@ export default function ContentModerationPage() {
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen]}
+        plugins={[Zoom, Fullscreen, Video]}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />
@@ -685,23 +724,20 @@ export default function ContentModerationPage() {
               <EmptySearch onClear={clearPostFilters} />
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {filteredPosts.reduce<{ el: React.ReactNode[]; idx: number }>(
-                  (acc, post) => {
-                    const slideIdx = post.media?.location ? acc.idx : -1;
-                    acc.el.push(
-                      <PostCard
-                        key={post._id}
-                        post={post}
-                        postTab={postFilter}
-                        onAction={handlePostAction}
-                        onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
-                      />
-                    );
-                    if (post.media?.location) acc.idx += 1;
-                    return acc;
-                  },
-                  { el: [], idx: 0 }
-                ).el}
+                {filteredPosts.map((post) => {
+                  const slideIdx = validFilteredPosts.findIndex((v) => v.post._id === post._id);
+                  return (
+                    <PostCard
+                      key={post._id}
+                      post={post}
+                      postTab={postFilter}
+                      onAction={handlePostAction}
+                      onView={() => {
+                        if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

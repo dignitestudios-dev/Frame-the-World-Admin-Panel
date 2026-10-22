@@ -7,19 +7,89 @@ export interface ContentMedia {
   _id?: string;
   fileName?: string;
   filename?: string; // some endpoints return lowercase
+  originalFilename?: string | null;
   key?: string;
   location: string;
+  mimetype?: string;
+  type?: "image" | "video" | string;
+  status?: string;
+  size?: number;
+  duration?: number;
+  thumbnail?: {
+    _id?: string;
+    filename?: string;
+    originalFilename?: string | null;
+    key?: string;
+    location?: string;
+    mimetype?: string;
+    size?: number;
+    status?: string;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
+export interface PostCategory {
+  _id: string;
+  name: string;
+  slug?: string;
+}
+
+export interface PostUser {
+  _id: string;
+  name?: string;
+  email?: string;
+  profilePicture?: {
+    _id?: string;
+    key?: string;
+    location?: string;
+  };
+}
+
 export interface Post {
   _id: string;
-  media?: ContentMedia | null;
+  media?: ContentMedia | ContentMedia[] | null;
+  mediaType?: "image" | "video" | string;
   status: string;
   caption?: string | null;
+  categories?: PostCategory[];
+  country?: string;
+  state?: string;
+  createdBy?: PostUser;
+  upvotes?: number;
+  downloads?: number;
+  framed?: number;
+  isDeleted?: boolean;
+  isBlockedByAdmin?: boolean;
+  isContentReleaseAccepted?: boolean;
   createdAt: string;
   updatedAt?: string;
+}
+
+export function getPostMedia(post: Post): ContentMedia | null {
+  if (!post.media) return null;
+  if (Array.isArray(post.media)) {
+    return post.media[0] ?? null;
+  }
+  return post.media;
+}
+
+export function getPostMediaUrl(post: Post): { previewUrl: string; fullUrl: string; isVideo: boolean } | null {
+  const media = getPostMedia(post);
+  if (!media?.location) return null;
+
+  const isVideo =
+    post.mediaType === "video" ||
+    media.type === "video" ||
+    Boolean(media.mimetype?.startsWith("video/")) ||
+    media.location.toLowerCase().endsWith(".mp4") ||
+    media.location.toLowerCase().endsWith(".mov") ||
+    media.location.toLowerCase().endsWith(".webm");
+
+  const previewUrl = isVideo ? (media.thumbnail?.location || media.location) : media.location;
+  const fullUrl = media.location;
+
+  return { previewUrl, fullUrl, isVideo };
 }
 
 export interface Frame {

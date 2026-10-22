@@ -10,18 +10,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Film,
+  Play,
   RefreshCw,
   ZoomIn,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   useFramePosts,
+  getPostMediaUrl,
   type FramePost,
   type ContentPagination,
 } from "@/lib/api/content.api";
@@ -104,8 +108,8 @@ function FramePostCard({
   post: FramePost;
   onView: () => void;
 }) {
-  const imgSrc = post.media?.location;
-  if (!imgSrc) return null;
+  const mediaInfo = getPostMediaUrl(post);
+  if (!mediaInfo) return null;
 
   const status = post.status ?? "unknown";
   const isCompleted = status === "completed";
@@ -117,8 +121,8 @@ function FramePostCard({
         onClick={onView}
       >
         <Image
-          src={imgSrc}
-          alt="Post image"
+          src={mediaInfo.previewUrl}
+          alt={post.caption || "Post image"}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -127,12 +131,12 @@ function FramePostCard({
         {/* Hover zoom overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <div className="flex size-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-2 ring-white/40">
-            <ZoomIn className="size-5 text-white" />
+            {mediaInfo.isVideo ? <Play className="size-5 text-white fill-white ml-0.5" /> : <ZoomIn className="size-5 text-white" />}
           </div>
         </div>
 
         {/* Status badge */}
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span className={cn(
             "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm",
             isCompleted
@@ -144,7 +148,24 @@ function FramePostCard({
               : <Clock className="size-2.5" />}
             {isCompleted ? "Completed" : "Pending"}
           </span>
+          {post.isDeleted && (
+            <span className="inline-flex items-center rounded-full bg-destructive/90 px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+              Deleted
+            </span>
+          )}
+          {post.isBlockedByAdmin && (
+            <span className="inline-flex items-center rounded-full bg-destructive/90 px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+              Blocked
+            </span>
+          )}
         </div>
+        {mediaInfo.isVideo && (
+          <div className="absolute right-2 top-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+              <Film className="size-2.5" /> Video
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Meta */}
@@ -179,9 +200,28 @@ export default function FramePostsPage({
   });
 
   const posts = data?.data ?? [];
-  const slides = posts
-    .filter((p) => p.media?.location)
-    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
+  const validPostsWithMedia = posts
+    .map((post) => ({ post, mediaInfo: getPostMediaUrl(post) }))
+    .filter((item): item is { post: FramePost; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
+
+  const slides = validPostsWithMedia.map(({ post, mediaInfo }) => {
+    if (mediaInfo.isVideo) {
+      return {
+        type: "video" as const,
+        poster: mediaInfo.previewUrl,
+        sources: [
+          {
+            src: mediaInfo.fullUrl,
+            type: "video/mp4",
+          },
+        ],
+      };
+    }
+    return {
+      src: mediaInfo.fullUrl,
+      alt: post.caption || "Post image",
+    };
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -191,7 +231,7 @@ export default function FramePostsPage({
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen]}
+        plugins={[Zoom, Fullscreen, Video]}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />
@@ -249,22 +289,18 @@ export default function FramePostsPage({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {posts.reduce<{ el: React.ReactNode[]; idx: number }>(
-              (acc, post) => {
-                const hasMedia = !!post.media?.location;
-                const slideIdx = hasMedia ? acc.idx : -1;
-                acc.el.push(
-                  <FramePostCard
-                    key={post._id}
-                    post={post}
-                    onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
-                  />
-                );
-                if (hasMedia) acc.idx += 1;
-                return acc;
-              },
-              { el: [], idx: 0 }
-            ).el}
+            {posts.map((post) => {
+              const slideIdx = validPostsWithMedia.findIndex((v) => v.post._id === post._id);
+              return (
+                <FramePostCard
+                  key={post._id}
+                  post={post}
+                  onView={() => {
+                    if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                  }}
+                />
+              );
+            })}
           </div>
         )}
       </div>

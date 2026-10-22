@@ -5,18 +5,19 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, BookImage, ChevronLeft, ChevronRight,
-  CheckCircle2, Clock, Globe, ImageIcon, Images, Lock, RefreshCw, ZoomIn,
+  CheckCircle2, Clock, Film, Globe, ImageIcon, Images, Lock, Play, RefreshCw, ZoomIn,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { usePosts, useFrames, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
+import { usePosts, useFrames, getPostMediaUrl, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
 import { useUserById } from "@/lib/api/users.api";
 import { UserAvatar } from "@/app/dashboard/users/components/user-avatar";
 
@@ -87,14 +88,15 @@ function Pager({ pagination, page, isFetching, onPage }: PagerProps) {
 // ─── Post card ────────────────────────────────────────────────────────────────
 
 function PostCard({ post, onView }: { post: Post; onView: () => void }) {
-  if (!post.media?.location) return null;
+  const mediaInfo = getPostMediaUrl(post);
+  if (!mediaInfo) return null;
   const status = getStatus(post.status);
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative aspect-[4/3] overflow-hidden bg-muted cursor-pointer" onClick={onView}>
         <Image
-          src={post.media.location}
-          alt="Post media"
+          src={mediaInfo.previewUrl}
+          alt={post.caption || "Post media"}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -102,17 +104,39 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
         {/* Hover overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <div className="flex size-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-            <ZoomIn className="size-5 text-white" />
+            {mediaInfo.isVideo ? <Play className="size-5 text-white fill-white ml-0.5" /> : <ZoomIn className="size-5 text-white" />}
           </div>
         </div>
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm", status.className)}>
             {post.status === "completed" ? <CheckCircle2 className="size-2.5" /> : <Clock className="size-2.5" />}
             {status.label}
           </span>
+          {post.isDeleted && (
+            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] backdrop-blur-sm">
+              Deleted
+            </Badge>
+          )}
+          {post.isBlockedByAdmin && (
+            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] backdrop-blur-sm">
+              Blocked
+            </Badge>
+          )}
         </div>
+        {mediaInfo.isVideo && (
+          <div className="absolute right-2 top-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+              <Film className="size-2.5" /> Video
+            </span>
+          </div>
+        )}
       </div>
       <div className="p-3">
+        {post.caption && (
+          <p className="text-xs font-medium text-foreground line-clamp-1 mb-1" title={post.caption}>
+            {post.caption}
+          </p>
+        )}
         <p className="text-[11px] text-muted-foreground">{fmtDate(post.createdAt)}</p>
       </div>
     </div>
@@ -212,9 +236,28 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
   const frames = framesData?.data?.frames ?? [];
   const isFetching = postsFetching || framesFetching;
 
-  const slides = posts
-    .filter((p) => p.media?.location)
-    .map((p) => ({ src: p.media!.location, alt: "Post image" }));
+  const validPostsWithMedia = posts
+    .map((post) => ({ post, mediaInfo: getPostMediaUrl(post) }))
+    .filter((item): item is { post: Post; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
+
+  const slides = validPostsWithMedia.map(({ post, mediaInfo }) => {
+    if (mediaInfo.isVideo) {
+      return {
+        type: "video" as const,
+        poster: mediaInfo.previewUrl,
+        sources: [
+          {
+            src: mediaInfo.fullUrl,
+            type: "video/mp4",
+          },
+        ],
+      };
+    }
+    return {
+      src: mediaInfo.fullUrl,
+      alt: post.caption || "Post image",
+    };
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -224,7 +267,7 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen]}
+        plugins={[Zoom, Fullscreen, Video]}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />
@@ -294,21 +337,18 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
             {postsLoading ? <GridSkeleton /> : posts.length === 0
               ? <Empty icon={Images} label="posts" />
               : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                  {posts.reduce<{ el: React.ReactNode[]; idx: number }>(
-                    (acc, post) => {
-                      const slideIdx = post.media?.location ? acc.idx : -1;
-                      acc.el.push(
-                        <PostCard
-                          key={post._id}
-                          post={post}
-                          onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
-                        />
-                      );
-                      if (post.media?.location) acc.idx += 1;
-                      return acc;
-                    },
-                    { el: [], idx: 0 }
-                  ).el}
+                  {posts.map((post) => {
+                    const slideIdx = validPostsWithMedia.findIndex((v) => v.post._id === post._id);
+                    return (
+                      <PostCard
+                        key={post._id}
+                        post={post}
+                        onView={() => {
+                          if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
             }
           </div>
