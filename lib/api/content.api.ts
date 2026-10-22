@@ -10,46 +10,22 @@ export interface ContentMedia {
   originalFilename?: string | null;
   key?: string;
   location: string;
-  mimetype?: string;
-  type?: "image" | "video" | string;
-  status?: string;
+  mimetype?: string; // e.g. "image/jpeg", "video/mp4"
+  type?: "image" | "video";
+  status?: string; // "ready" once the upload has been processed
   size?: number;
-  duration?: number;
-  thumbnail?: {
-    _id?: string;
-    filename?: string;
-    originalFilename?: string | null;
-    key?: string;
-    location?: string;
-    mimetype?: string;
-    size?: number;
-    status?: string;
-  } | null;
+  duration?: number; // seconds, videos only
+  thumbnail?: string | null; // unpopulated media id for videos — not a URL
   createdAt?: string;
   updatedAt?: string;
 }
 
-export interface PostCategory {
-  _id: string;
-  name: string;
-  slug?: string;
-}
-
-export interface PostUser {
-  _id: string;
-  name?: string;
-  email?: string;
-  profilePicture?: {
-    _id?: string;
-    key?: string;
-    location?: string;
-  };
-}
+export type PostMediaType = "image" | "video";
 
 export interface Post {
   _id: string;
-  media?: ContentMedia | ContentMedia[] | null;
-  mediaType?: "image" | "video" | string;
+  media?: ContentMedia | null;
+  mediaType?: PostMediaType;
   status: string;
   caption?: string | null;
   categories?: PostCategory[];

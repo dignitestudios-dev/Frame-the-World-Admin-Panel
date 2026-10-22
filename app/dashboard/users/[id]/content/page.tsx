@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, BookImage, ChevronLeft, ChevronRight,
-  CheckCircle2, Clock, Film, Globe, ImageIcon, Images, Lock, Play, RefreshCw, ZoomIn,
+  CheckCircle2, Clock, Globe, ImageIcon, Images, Lock, RefreshCw,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
@@ -16,8 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
-import { usePosts, useFrames, getPostMediaUrl, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
+import { cn, formatStatusLabel } from "@/lib/utils";
+import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
+import { usePosts, useFrames, type Post, type Frame, type ContentPagination } from "@/lib/api/content.api";
 import { useUserById } from "@/lib/api/users.api";
 import { UserAvatar } from "@/app/dashboard/users/components/user-avatar";
 
@@ -34,7 +35,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   flagged:   { label: "Flagged",   className: "bg-white text-red-700 border-red-300" },
 };
 const getStatus = (s: string) =>
-  STATUS_CONFIG[s.toLowerCase()] ?? { label: s, className: "bg-muted text-muted-foreground border-border" };
+  STATUS_CONFIG[s.toLowerCase()] ?? { label: formatStatusLabel(s), className: "bg-muted text-muted-foreground border-border" };
 
 // ─── Skeleton grid ────────────────────────────────────────────────────────────
 
@@ -94,20 +95,11 @@ function PostCard({ post, onView }: { post: Post; onView: () => void }) {
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative aspect-[4/3] overflow-hidden bg-muted cursor-pointer" onClick={onView}>
-        <Image
-          src={mediaInfo.previewUrl}
-          alt={post.caption || "Post media"}
-          fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        <PostMediaCover
+          post={post}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-        {/* Hover overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <div className="flex size-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-            {mediaInfo.isVideo ? <Play className="size-5 text-white fill-white ml-0.5" /> : <ZoomIn className="size-5 text-white" />}
-          </div>
-        </div>
-        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+        <div className="absolute left-2 top-2">
           <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm", status.className)}>
             {post.status === "completed" ? <CheckCircle2 className="size-2.5" /> : <Clock className="size-2.5" />}
             {status.label}
@@ -236,28 +228,9 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
   const frames = framesData?.data?.frames ?? [];
   const isFetching = postsFetching || framesFetching;
 
-  const validPostsWithMedia = posts
-    .map((post) => ({ post, mediaInfo: getPostMediaUrl(post) }))
-    .filter((item): item is { post: Post; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
-
-  const slides = validPostsWithMedia.map(({ post, mediaInfo }) => {
-    if (mediaInfo.isVideo) {
-      return {
-        type: "video" as const,
-        poster: mediaInfo.previewUrl,
-        sources: [
-          {
-            src: mediaInfo.fullUrl,
-            type: "video/mp4",
-          },
-        ],
-      };
-    }
-    return {
-      src: mediaInfo.fullUrl,
-      alt: post.caption || "Post image",
-    };
-  });
+  const slides = posts
+    .filter((p) => p.media?.location)
+    .map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -267,7 +240,8 @@ export default function UserContentPage({ params }: { params: Promise<{ id: stri
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen, Video]}
+        plugins={[Video, Zoom, Fullscreen]}
+        video={lightboxVideoOptions}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />

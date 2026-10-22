@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, use } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -13,7 +12,6 @@ import {
   Film,
   Play,
   RefreshCw,
-  ZoomIn,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
@@ -22,7 +20,8 @@ import Video from "yet-another-react-lightbox/plugins/video";
 import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatStatusLabel } from "@/lib/utils";
+import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   useFramePosts,
   getPostMediaUrl,
@@ -120,20 +119,10 @@ function FramePostCard({
         className="relative aspect-[4/3] cursor-pointer overflow-hidden bg-muted"
         onClick={onView}
       >
-        <Image
-          src={mediaInfo.previewUrl}
-          alt={post.caption || "Post image"}
-          fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        <PostMediaCover
+          post={post}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-
-        {/* Hover zoom overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <div className="flex size-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-2 ring-white/40">
-            {mediaInfo.isVideo ? <Play className="size-5 text-white fill-white ml-0.5" /> : <ZoomIn className="size-5 text-white" />}
-          </div>
-        </div>
 
         {/* Status badge */}
         <div className="absolute left-2 top-2 flex flex-wrap gap-1">
@@ -146,7 +135,7 @@ function FramePostCard({
             {isCompleted
               ? <CheckCircle2 className="size-2.5" />
               : <Clock className="size-2.5" />}
-            {isCompleted ? "Completed" : "Pending"}
+            {formatStatusLabel(status)}
           </span>
           {post.isDeleted && (
             <span className="inline-flex items-center rounded-full bg-destructive/90 px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground">
@@ -200,28 +189,9 @@ export default function FramePostsPage({
   });
 
   const posts = data?.data ?? [];
-  const validPostsWithMedia = posts
-    .map((post) => ({ post, mediaInfo: getPostMediaUrl(post) }))
-    .filter((item): item is { post: FramePost; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
-
-  const slides = validPostsWithMedia.map(({ post, mediaInfo }) => {
-    if (mediaInfo.isVideo) {
-      return {
-        type: "video" as const,
-        poster: mediaInfo.previewUrl,
-        sources: [
-          {
-            src: mediaInfo.fullUrl,
-            type: "video/mp4",
-          },
-        ],
-      };
-    }
-    return {
-      src: mediaInfo.fullUrl,
-      alt: post.caption || "Post image",
-    };
-  });
+  const slides = posts
+    .filter((p) => p.media?.location)
+    .map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -231,7 +201,8 @@ export default function FramePostsPage({
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen, Video]}
+        plugins={[Video, Zoom, Fullscreen]}
+        video={lightboxVideoOptions}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />

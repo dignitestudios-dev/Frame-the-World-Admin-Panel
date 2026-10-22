@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ShieldCheck, Images, BookImage, RefreshCw,
   ChevronLeft, ChevronRight, Lock, Globe, ImageIcon,
-  CheckCircle2, Clock, Film, Play, ZoomIn, Search, X, Filter, MoreVertical, Trash2, Ban, Undo,
+  CheckCircle2, Clock, Search, X, Filter, MoreVertical, Trash2, Ban, Undo,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
@@ -31,7 +31,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatStatusLabel } from "@/lib/utils";
+import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   usePosts,
   useFrames,
@@ -65,7 +66,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 };
 const getStatus = (s: string) =>
   STATUS_CONFIG[s.toLowerCase()] ?? {
-    label: s,
+    label: formatStatusLabel(s),
     className: "bg-white text-muted-foreground border-border",
   };
 
@@ -257,19 +258,10 @@ function PostCard({
         className="relative aspect-[4/3] cursor-pointer overflow-hidden bg-muted"
         onClick={onView}
       >
-        <Image
-          src={mediaInfo.previewUrl}
-          alt={post.caption || "Post media"}
-          fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        <PostMediaCover
+          post={post}
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-        {/* Hover overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <div className="flex size-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-2 ring-white/40">
-            {mediaInfo.isVideo ? <Play className="size-5 text-white fill-white ml-0.5" /> : <ZoomIn className="size-5 text-white" />}
-          </div>
-        </div>
         {/* Status overlay badge */}
         <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span
@@ -564,24 +556,9 @@ export default function ContentModerationPage() {
     .filter((item): item is { post: Post; mediaInfo: NonNullable<ReturnType<typeof getPostMediaUrl>> } => !!item.mediaInfo);
 
   // Rebuild slide index from filtered posts for lightbox
-  const slides = validFilteredPosts.map(({ post, mediaInfo }) => {
-    if (mediaInfo.isVideo) {
-      return {
-        type: "video" as const,
-        poster: mediaInfo.previewUrl,
-        sources: [
-          {
-            src: mediaInfo.fullUrl,
-            type: "video/mp4",
-          },
-        ],
-      };
-    }
-    return {
-      src: mediaInfo.fullUrl,
-      alt: post.caption || "Post image",
-    };
-  });
+  const slides = filteredPosts
+    .filter((p) => p.media?.location)
+    .map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -591,7 +568,8 @@ export default function ContentModerationPage() {
         index={lightboxIndex}
         close={() => setLightboxIndex(-1)}
         slides={slides}
-        plugins={[Zoom, Fullscreen, Video]}
+        plugins={[Video, Zoom, Fullscreen]}
+        video={lightboxVideoOptions}
         zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true }}
         styles={{ container: { backgroundColor: "rgba(0,0,0,0.95)" } }}
       />
