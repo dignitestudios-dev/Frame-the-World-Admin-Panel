@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Film,
+  Play,
   RefreshCw,
 } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
@@ -22,6 +24,8 @@ import { cn, formatStatusLabel } from "@/lib/utils";
 import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
 import {
   useFramePosts,
+  getPostMedia,
+  getPostMediaUrl,
   type FramePost,
   type ContentPagination,
 } from "@/lib/api/content.api";
@@ -104,8 +108,8 @@ function FramePostCard({
   post: FramePost;
   onView: () => void;
 }) {
-  const imgSrc = post.media?.location;
-  if (!imgSrc) return null;
+  const media = getPostMedia(post);
+  if (!media?.location) return null;
 
   const status = post.status ?? "unknown";
   const isCompleted = status === "completed";
@@ -122,7 +126,7 @@ function FramePostCard({
         />
 
         {/* Status badge */}
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span className={cn(
             "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm",
             isCompleted
@@ -134,6 +138,16 @@ function FramePostCard({
               : <Clock className="size-2.5" />}
             {formatStatusLabel(status)}
           </span>
+          {post.isDeleted && (
+            <span className="inline-flex items-center rounded-full bg-destructive/90 px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+              Deleted
+            </span>
+          )}
+          {post.isBlockedByAdmin && (
+            <span className="inline-flex items-center rounded-full bg-destructive/90 px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+              Blocked
+            </span>
+          )}
         </div>
       </div>
 
@@ -169,9 +183,8 @@ export default function FramePostsPage({
   });
 
   const posts = data?.data ?? [];
-  const slides = posts
-    .filter((p) => p.media?.location)
-    .map(postToSlide);
+  const validPosts = posts.filter((p) => Boolean(getPostMedia(p)?.location));
+  const slides = validPosts.map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -240,22 +253,18 @@ export default function FramePostsPage({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {posts.reduce<{ el: React.ReactNode[]; idx: number }>(
-              (acc, post) => {
-                const hasMedia = !!post.media?.location;
-                const slideIdx = hasMedia ? acc.idx : -1;
-                acc.el.push(
-                  <FramePostCard
-                    key={post._id}
-                    post={post}
-                    onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
-                  />
-                );
-                if (hasMedia) acc.idx += 1;
-                return acc;
-              },
-              { el: [], idx: 0 }
-            ).el}
+            {posts.map((post) => {
+              const slideIdx = validPosts.findIndex((v) => v._id === post._id);
+              return (
+                <FramePostCard
+                  key={post._id}
+                  post={post}
+                  onView={() => {
+                    if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                  }}
+                />
+              );
+            })}
           </div>
         )}
       </div>

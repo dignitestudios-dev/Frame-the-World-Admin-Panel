@@ -1,16 +1,21 @@
-"use client";
-
 import Image from "next/image";
 import { Loader2, Play, ZoomIn } from "lucide-react";
 import type { Slide } from "yet-another-react-lightbox";
-import type { Post } from "@/lib/api/content.api";
+import { getPostMedia, type Post } from "@/lib/api/content.api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export const isVideoPost = (post: Post) =>
-  post.mediaType === "video" ||
-  post.media?.type === "video" ||
-  Boolean(post.media?.mimetype?.startsWith("video/"));
+export const isVideoPost = (post: Post) => {
+  const media = getPostMedia(post);
+  return (
+    post.mediaType === "video" ||
+    media?.type === "video" ||
+    Boolean(media?.mimetype?.startsWith("video/")) ||
+    media?.location?.toLowerCase().endsWith(".mp4") ||
+    media?.location?.toLowerCase().endsWith(".mov") ||
+    media?.location?.toLowerCase().endsWith(".webm")
+  );
+};
 
 export const formatDuration = (seconds?: number) => {
   if (!seconds || seconds < 0) return null;
@@ -22,14 +27,17 @@ export const formatDuration = (seconds?: number) => {
 
 /** Lightbox slide for a post — needs the YARL `Video` plugin for video posts. */
 export const postToSlide = (post: Post): Slide => {
-  const src = post.media!.location;
+  const media = getPostMedia(post);
+  const src = media?.location ?? "";
   if (isVideoPost(post)) {
+    const poster = typeof media?.thumbnail === "object" ? media?.thumbnail?.location : undefined;
     return {
       type: "video",
-      sources: [{ src, type: post.media?.mimetype ?? "video/mp4" }],
+      poster,
+      sources: [{ src, type: media?.mimetype ?? "video/mp4" }],
     };
   }
-  return { src, alt: "Post image" };
+  return { src, alt: post.caption || "Post image" };
 };
 
 /** Shared YARL `video` options so every lightbox plays videos the same way. */
@@ -48,25 +56,36 @@ export const lightboxVideoOptions = {
  * plus a play icon, duration badge, and hover overlay.
  */
 export function PostMediaCover({ post, sizes }: { post: Post; sizes: string }) {
-  const media = post.media;
+  const media = getPostMedia(post);
   if (!media?.location) return null;
 
   const isVideo = isVideoPost(post);
   const duration = formatDuration(media.duration);
   const isProcessing = isVideo && media.status !== undefined && media.status !== "ready";
+  const posterUrl = typeof media.thumbnail === "object" ? media.thumbnail?.location : undefined;
 
   return (
     <>
       {isVideo ? (
-        <video
-          // #t= forces browsers (notably Safari) to paint a frame instead of a blank box
-          src={`${media.location}#t=0.1`}
-          preload="metadata"
-          muted
-          playsInline
-          disablePictureInPicture
-          className="pointer-events-none absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+        posterUrl ? (
+          <Image
+            src={posterUrl}
+            alt={post.caption || "Post media"}
+            fill
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            sizes={sizes}
+          />
+        ) : (
+          <video
+            // #t= forces browsers (notably Safari) to paint a frame instead of a blank box
+            src={`${media.location}#t=0.1`}
+            preload="metadata"
+            muted
+            playsInline
+            disablePictureInPicture
+            className="pointer-events-none absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        )
       ) : (
         <Image
           src={media.location}

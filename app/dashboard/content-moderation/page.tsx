@@ -42,6 +42,8 @@ import {
   useDeleteFrame,
   useBlockFrame,
   useRestoreFrame,
+  getPostMedia,
+  getPostMediaUrl,
   type Post,
   type Frame,
   type ContentPagination,
@@ -247,7 +249,8 @@ function PostCard({
   postTab: PostFilterTab;
   onAction: (action: "delete" | "block" | "restore", postId: string) => void;
 }) {
-  if (!post.media?.location) return null;
+  const media = getPostMedia(post);
+  if (!media?.location) return null;
   const status = getStatus(post.status);
   return (
     <div className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
@@ -261,7 +264,7 @@ function PostCard({
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
         {/* Status overlay badge */}
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm",
@@ -275,6 +278,16 @@ function PostCard({
             )}
             {status.label}
           </span>
+          {post.isDeleted && (
+            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] backdrop-blur-sm">
+              Deleted
+            </Badge>
+          )}
+          {post.isBlockedByAdmin && (
+            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] backdrop-blur-sm">
+              Blocked
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -532,10 +545,8 @@ export default function ContentModerationPage() {
   const clearPostFilters = () => { setPostFilter("all"); };
   const clearFrameFilters = () => { setFrameFilter("all"); setFrameSearch(""); };
 
-  // Rebuild slide index from filtered posts for lightbox
-  const slides = filteredPosts
-    .filter((p) => p.media?.location)
-    .map(postToSlide);
+  const validFilteredPosts = filteredPosts.filter((p) => Boolean(getPostMedia(p)?.location));
+  const slides = validFilteredPosts.map(postToSlide);
 
   return (
     <div className="space-y-6 p-6">
@@ -679,23 +690,20 @@ export default function ContentModerationPage() {
               <EmptySearch onClear={clearPostFilters} />
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {filteredPosts.reduce<{ el: React.ReactNode[]; idx: number }>(
-                  (acc, post) => {
-                    const slideIdx = post.media?.location ? acc.idx : -1;
-                    acc.el.push(
-                      <PostCard
-                        key={post._id}
-                        post={post}
-                        postTab={postFilter}
-                        onAction={handlePostAction}
-                        onView={() => slideIdx >= 0 && setLightboxIndex(slideIdx)}
-                      />
-                    );
-                    if (post.media?.location) acc.idx += 1;
-                    return acc;
-                  },
-                  { el: [], idx: 0 }
-                ).el}
+                {filteredPosts.map((post) => {
+                  const slideIdx = validFilteredPosts.findIndex((v) => v._id === post._id);
+                  return (
+                    <PostCard
+                      key={post._id}
+                      post={post}
+                      postTab={postFilter}
+                      onAction={handlePostAction}
+                      onView={() => {
+                        if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
