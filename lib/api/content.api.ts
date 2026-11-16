@@ -76,6 +76,51 @@ export function getPostMedia(post: Post): ContentMedia | null {
   return post.media;
 }
 
+export function getAllPostMedia(post: Post): ContentMedia[] {
+  if (!post.media) return [];
+  if (Array.isArray(post.media)) {
+    return post.media.filter((m): m is ContentMedia => Boolean(m?.location));
+  }
+  return post.media.location ? [post.media] : [];
+}
+
+export function isMediaItemVideo(media?: ContentMedia | null, fallbackMediaType?: string): boolean {
+  if (!media) return false;
+  return (
+    media.type === "video" ||
+    fallbackMediaType === "video" ||
+    Boolean(media.mimetype?.startsWith("video/")) ||
+    media.location?.toLowerCase().endsWith(".mp4") ||
+    media.location?.toLowerCase().endsWith(".mov") ||
+    media.location?.toLowerCase().endsWith(".webm") ||
+    false
+  );
+}
+
+export function getPostMediaCount(post: Post): {
+  images: number;
+  videos: number;
+  total: number;
+} {
+  const items = getAllPostMedia(post);
+  if (items.length === 0) {
+    return { images: 0, videos: 0, total: 0 };
+  }
+
+  let images = 0;
+  let videos = 0;
+
+  for (const item of items) {
+    if (isMediaItemVideo(item, post.mediaType)) {
+      videos++;
+    } else {
+      images++;
+    }
+  }
+
+  return { images, videos, total: items.length };
+}
+
 export function getPostMediaUrl(post: Post): { previewUrl: string; fullUrl: string; isVideo: boolean } | null {
   const media = getPostMedia(post);
   if (!media?.location) return null;

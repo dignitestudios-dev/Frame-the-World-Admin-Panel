@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn, formatStatusLabel } from "@/lib/utils";
-import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
+import { PostMediaCover, PostMediaCountBadge, postToSlides, lightboxVideoOptions } from "@/components/post-media";
 import {
   usePosts,
   useFrames,
@@ -288,6 +288,11 @@ function PostCard({
               Blocked
             </Badge>
           )}
+        </div>
+
+        {/* Media count badge (Images / Videos / Both) */}
+        <div className="absolute right-2 top-2">
+          <PostMediaCountBadge post={post} />
         </div>
       </div>
 
@@ -546,7 +551,20 @@ export default function ContentModerationPage() {
   const clearFrameFilters = () => { setFrameFilter("all"); setFrameSearch(""); };
 
   const validFilteredPosts = filteredPosts.filter((p) => Boolean(getPostMedia(p)?.location));
-  const slides = validFilteredPosts.map(postToSlide);
+  const postStartIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let currentIdx = 0;
+    for (const post of validFilteredPosts) {
+      map.set(post._id, currentIdx);
+      const postSlides = postToSlides(post);
+      currentIdx += postSlides.length > 0 ? postSlides.length : 1;
+    }
+    return map;
+  }, [validFilteredPosts]);
+
+  const slides = useMemo(() => {
+    return validFilteredPosts.flatMap((post) => postToSlides(post));
+  }, [validFilteredPosts]);
 
   return (
     <div className="space-y-6 p-6">
@@ -691,7 +709,7 @@ export default function ContentModerationPage() {
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {filteredPosts.map((post) => {
-                  const slideIdx = validFilteredPosts.findIndex((v) => v._id === post._id);
+                  const slideIdx = postStartIndexMap.get(post._id);
                   return (
                     <PostCard
                       key={post._id}
@@ -699,7 +717,7 @@ export default function ContentModerationPage() {
                       postTab={postFilter}
                       onAction={handlePostAction}
                       onView={() => {
-                        if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                        if (slideIdx !== undefined && slideIdx >= 0) setLightboxIndex(slideIdx);
                       }}
                     />
                   );

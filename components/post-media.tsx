@@ -1,20 +1,20 @@
 import Image from "next/image";
-import { Loader2, Play, ZoomIn } from "lucide-react";
+import { Loader2, Play, ZoomIn, ImageIcon, Film, Layers } from "lucide-react";
 import type { Slide } from "yet-another-react-lightbox";
-import { getPostMedia, type Post } from "@/lib/api/content.api";
+import {
+  getPostMedia,
+  getAllPostMedia,
+  isMediaItemVideo,
+  getPostMediaCount,
+  type ContentMedia,
+  type Post,
+} from "@/lib/api/content.api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export const isVideoPost = (post: Post) => {
   const media = getPostMedia(post);
-  return (
-    post.mediaType === "video" ||
-    media?.type === "video" ||
-    Boolean(media?.mimetype?.startsWith("video/")) ||
-    media?.location?.toLowerCase().endsWith(".mp4") ||
-    media?.location?.toLowerCase().endsWith(".mov") ||
-    media?.location?.toLowerCase().endsWith(".webm")
-  );
+  return isMediaItemVideo(media, post.mediaType);
 };
 
 export const formatDuration = (seconds?: number) => {
@@ -25,19 +25,34 @@ export const formatDuration = (seconds?: number) => {
   return `${m}:${String(s).padStart(2, "0")}`;
 };
 
-/** Lightbox slide for a post — needs the YARL `Video` plugin for video posts. */
-export const postToSlide = (post: Post): Slide => {
-  const media = getPostMedia(post);
-  const src = media?.location ?? "";
-  if (isVideoPost(post)) {
-    const poster = typeof media?.thumbnail === "object" ? media?.thumbnail?.location : undefined;
+/** Convert a single media item to a lightbox slide */
+export const mediaToSlide = (media: ContentMedia, caption?: string | null): Slide => {
+  const src = media.location;
+  if (isMediaItemVideo(media)) {
+    const poster = typeof media.thumbnail === "object" ? media.thumbnail?.location : undefined;
     return {
       type: "video",
       poster,
-      sources: [{ src, type: media?.mimetype ?? "video/mp4" }],
+      sources: [{ src, type: media.mimetype ?? "video/mp4" }],
     };
   }
-  return { src, alt: post.caption || "Post image" };
+  return { src, alt: caption || "Post image" };
+};
+
+/** Lightbox slides for all media in a post */
+export const postToSlides = (post: Post): Slide[] => {
+  const allMedia = getAllPostMedia(post);
+  if (allMedia.length === 0) {
+    const fallback = getPostMedia(post);
+    return fallback?.location ? [mediaToSlide(fallback, post.caption)] : [];
+  }
+  return allMedia.map((m) => mediaToSlide(m, post.caption));
+};
+
+/** Lightbox slide for a post (first media item) — kept for backwards compatibility */
+export const postToSlide = (post: Post): Slide => {
+  const slides = postToSlides(post);
+  return slides[0] ?? { src: "", alt: post.caption || "Post image" };
 };
 
 /** Shared YARL `video` options so every lightbox plays videos the same way. */
@@ -47,6 +62,41 @@ export const lightboxVideoOptions = {
   autoPlay: true,
   preload: "metadata",
 } as const;
+
+// ─── Media Count Badge ────────────────────────────────────────────────────────
+
+export function PostMediaCountBadge({ post }: { post: Post }) {
+  const { images, videos, total } = getPostMediaCount(post);
+
+  if (total === 0) return null;
+
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white/95 backdrop-blur-sm shadow-sm ring-1 ring-white/20">
+      {images > 0 && videos > 0 ? (
+        <>
+          <Layers className="size-2.5 text-sky-300 drop-shadow-sm" />
+          <span>
+            {images} img{images > 1 ? "s" : ""} • {videos} vid{videos > 1 ? "s" : ""}
+          </span>
+        </>
+      ) : videos > 0 ? (
+        <>
+          <Film className="size-2.5 text-amber-300 drop-shadow-sm" />
+          <span>
+            {videos} {videos === 1 ? "video" : "videos"}
+          </span>
+        </>
+      ) : (
+        <>
+          <ImageIcon className="size-2.5 text-emerald-300 drop-shadow-sm" />
+          <span>
+            {images} {images === 1 ? "image" : "images"}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ─── Card cover ───────────────────────────────────────────────────────────────
 

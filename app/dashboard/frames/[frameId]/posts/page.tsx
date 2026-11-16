@@ -21,7 +21,7 @@ import "yet-another-react-lightbox/styles.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn, formatStatusLabel } from "@/lib/utils";
-import { PostMediaCover, postToSlide, lightboxVideoOptions } from "@/components/post-media";
+import { PostMediaCover, PostMediaCountBadge, postToSlides, lightboxVideoOptions } from "@/components/post-media";
 import {
   useFramePosts,
   getPostMedia,
@@ -149,6 +149,11 @@ function FramePostCard({
             </span>
           )}
         </div>
+
+        {/* Media count badge (Images / Videos / Both) */}
+        <div className="absolute right-2 top-2">
+          <PostMediaCountBadge post={post} />
+        </div>
       </div>
 
       {/* Meta */}
@@ -184,7 +189,20 @@ export default function FramePostsPage({
 
   const posts = data?.data ?? [];
   const validPosts = posts.filter((p) => Boolean(getPostMedia(p)?.location));
-  const slides = validPosts.map(postToSlide);
+  const postStartIndexMap = React.useMemo(() => {
+    const map = new Map<string, number>();
+    let currentIdx = 0;
+    for (const post of validPosts) {
+      map.set(post._id, currentIdx);
+      const postSlides = postToSlides(post);
+      currentIdx += postSlides.length > 0 ? postSlides.length : 1;
+    }
+    return map;
+  }, [validPosts]);
+
+  const slides = React.useMemo(() => {
+    return validPosts.flatMap((post) => postToSlides(post));
+  }, [validPosts]);
 
   return (
     <div className="space-y-6 p-6">
@@ -254,13 +272,13 @@ export default function FramePostsPage({
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {posts.map((post) => {
-              const slideIdx = validPosts.findIndex((v) => v._id === post._id);
+              const slideIdx = postStartIndexMap.get(post._id);
               return (
                 <FramePostCard
                   key={post._id}
                   post={post}
                   onView={() => {
-                    if (slideIdx >= 0) setLightboxIndex(slideIdx);
+                    if (slideIdx !== undefined && slideIdx >= 0) setLightboxIndex(slideIdx);
                   }}
                 />
               );
